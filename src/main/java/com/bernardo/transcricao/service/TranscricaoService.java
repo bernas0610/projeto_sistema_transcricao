@@ -17,18 +17,22 @@ public class TranscricaoService {
 
     private final TranscricaoRepository repository;
     private final ArmazenamentoService armazenamento;
+    private final TranscricaoProcessor processor;
 
     public Transcricao criar(MultipartFile arquivo) {
         Path caminho = armazenamento.salvar(arquivo);
+        Transcricao salva;
         try {
             Transcricao transcricao = new Transcricao();
             transcricao.setNomeArquivoOriginal(limitar(arquivo.getOriginalFilename(), 255));
             transcricao.setCaminhoArquivo(caminho.toString());
-            return repository.save(transcricao);
+            salva = repository.save(transcricao);
         } catch (RuntimeException e) {
             armazenamento.remover(caminho);
             throw e;
         }
+        processor.processar(salva.getId()); // roda em segundo plano
+        return salva;
     }
 
     public Transcricao buscar(UUID id) {
