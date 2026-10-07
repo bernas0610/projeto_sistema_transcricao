@@ -12,6 +12,10 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import lombok.extern.slf4j.Slf4j;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -23,10 +27,14 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 @Service
+@Slf4j
 public class GeminiTranscriptionProvider implements TranscriptionProvider {
 
     private static final String HEADER_CHAVE = "x-goog-api-key";
-    private static final int MAX_TENTATIVAS = 3;
+    private static final int MAX_TENTATIVAS = 5;
+    private static final long ESPERA_MAXIMA_SEGUNDOS = 180;
+    private static final Pattern RETRY_EM =
+            Pattern.compile("retry in (\\d+(?:\\.\\d+)?)s", Pattern.CASE_INSENSITIVE);
 
     private final RestClient client;
     private final String apiKey;
@@ -202,6 +210,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
 
     private <T> T comRetry(String operacao, Supplier<T> acao) {
         for (int tentativa = 1; ; tentativa++) {
+            Duration espera;
             try {
                 return acao.get();
             } catch (RestClientResponseException e) {
@@ -211,14 +220,31 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
                     throw new TranscriptionException("Falha em " + operacao + " (HTTP " + status + "): "
                             + resumo(e.getResponseBodyAsString()), e);
                 }
+                espera = esperaApos(e, tentativa);
             } catch (ResourceAccessException e) {
                 if (tentativa >= MAX_TENTATIVAS) {
                     throw new TranscriptionException(
                             "Falha em " + operacao + " (rede/timeout): " + e.getMessage(), e);
                 }
+                espera = Duration.ofSeconds(10L * tentativa);
             }
-            dormir(Duration.ofSeconds(10L * tentativa));
+            log.warn("Gemini: {} falhou (tentativa {}/{}); nova tentativa em {}s",
+                    operacao, tentativa, MAX_TENTATIVAS, espera.toSeconds());
+            dormir(espera);
         }
+    }
+
+    private Duration esperaApos(RestClientResponseException e, int tentativa) {
+        if (e.getStatusCode().value() == 429) {
+            Matcher m = RETRY_EM.matcher(e.getResponseBodyAsString());
+            if (m.find()) {
+                // usa o tempo que o próprio Gemini pediu, com margem de 5 s
+                long segundos = (long) Math.ceil(Double.parseDouble(m.group(1))) + 5;
+                return Duration.ofSeconds(Math.min(segundos, ESPERA_MAXIMA_SEGUNDOS));
+            }
+            return Duration.ofSeconds(Math.min(30L * tentativa, ESPERA_MAXIMA_SEGUNDOS));
+        }
+        return Duration.ofSeconds(10L * tentativa);
     }
 
     private void dormir(Duration duracao) {
