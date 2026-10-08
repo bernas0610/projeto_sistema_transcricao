@@ -33,4 +33,4 @@ build/
 .vscode/
 
 uploads/
-teste.mp3
+teste*.mp3

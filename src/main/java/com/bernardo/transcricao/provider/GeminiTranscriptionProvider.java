@@ -41,17 +41,24 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
     private final String baseUrl;
     private final String modelo;
     private final String idioma;
+    private final String prompt;
 
     public GeminiTranscriptionProvider(
             @Value("${app.gemini.api-key:}") String apiKey,
             @Value("${app.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
             @Value("${app.gemini.model:gemini-3.5-transcribe}") String modelo,
             @Value("${app.gemini.idioma:pt-BR}") String idioma,
-            @Value("${app.gemini.timeout-minutos:10}") long timeoutMinutos) {
+            @Value("${app.gemini.timeout-minutos:10}") long timeoutMinutos,
+            @Value("${app.gemini.prompt:}") String prompt)
+
+
+    {
+
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         this.modelo = modelo;
         this.idioma = idioma;
+        this.prompt = prompt;
 
         JdkClientHttpRequestFactory fabrica = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build());
@@ -134,15 +141,27 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
     }
 
     private String gerar(String uriArquivo, String mimeType) {
-        Map<String, Object> corpo = Map.of(
-                "model", modelo,
-                "input", List.of(Map.of(
-                        "type", "audio",
-                        "uri", uriArquivo,
-                        "mime_type", mimeType)),
-                "generation_config", Map.of(
-                        "transcription_config", Map.of(
-                                "language_codes", List.of(idioma))));
+        Map<String, Object> audio = Map.of(
+                "type", "audio",
+                "uri", uriArquivo,
+                "mime_type", mimeType);
+
+        Map<String, Object> corpo;
+        if (prompt == null || prompt.isBlank()) {
+            // modelo dedicado de transcrição
+            corpo = Map.of(
+                    "model", modelo,
+                    "input", List.of(audio),
+                    "generation_config", Map.of(
+                            "transcription_config", Map.of(
+                                    "language_codes", List.of(idioma))));
+        } else {
+            // modelo geral: o pedido de transcrição vai como texto
+            Map<String, Object> texto = Map.of("type", "text", "text", prompt);
+            corpo = Map.of(
+                    "model", modelo,
+                    "input", List.of(texto, audio));
+        }
 
         InteractionResponse resposta = client.post()
                 .uri(URI.create(baseUrl + "/v1beta/interactions"))
