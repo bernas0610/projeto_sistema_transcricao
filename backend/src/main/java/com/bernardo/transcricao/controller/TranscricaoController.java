@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
 import java.util.UUID;
+import com.bernardo.transcricao.dto.TranscricoesPage;
 
 @RestController
 @RequestMapping("/transcricoes")
@@ -20,6 +21,12 @@ import java.util.UUID;
 public class TranscricaoController {
 
     private final TranscricaoService service;
+
+    @GetMapping
+    public TranscricoesPage listar(@RequestParam(defaultValue = "0") int pagina,
+            @AuthenticationPrincipal UsuarioPrincipal usuario) {
+        return service.listar(usuario.id(), pagina);
+    }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TranscricaoResponse> criar(@RequestParam("arquivo") MultipartFile arquivo,

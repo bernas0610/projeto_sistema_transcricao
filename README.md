@@ -153,3 +153,52 @@ substituem o processador e o provedor para não consumir cota externa:
 cd backend
 .\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest' test
 ```
+
+## Frontend — Voz em Flor
+
+A interface fica em `frontend/`, separada do projeto Maven em `backend/`.
+O visual segue o protótipo Voz em Flor, com versão para computador e celular.
+Inclui login, upload com progresso, gravação pelo microfone, histórico paginado,
+acompanhamento de status, cópia e download do texto e cadastro de usuários pelo admin.
+
+Com o backend rodando na porta 8080, abra outro terminal na raiz do repositório:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Acesse http://localhost:5173 e entre com uma conta já cadastrada. É necessário
+Node.js 22 ou superior; o frontend usa HTML, CSS e JavaScript sem dependências
+externas. Não há cadastro público: o admin cria os acessos na aba Usuários.
+
+O servidor Node encaminha `/auth/*` e `/transcricoes` ao Spring Boot, preservando
+cookie de sessão, CSRF e multipart. Abra a interface pelo servidor, não diretamente
+pelo arquivo HTML. Para outra porta do backend, configure `API_TARGET` antes de iniciar:
+
+```powershell
+$env:API_TARGET = 'http://localhost:8081'
+npm run dev
+```
+
+O limite de upload é 300 MB, igual ao backend. A gravação requer permissão de
+microfone e um navegador com MediaRecorder, em localhost ou HTTPS. Gravar não
+consome cota; enviar o áudio consome um dos cinco arquivos diários. O status é
+consultado a cada cinco segundos enquanto há jobs pendentes na página atual.
+
+`GET /transcricoes?pagina=0` retorna `itens`, `pagina`, `totalPaginas` e `total`,
+com até 20 transcrições da própria conta por página, ordenadas da mais recente
+para a mais antiga. A numeração começa em zero.
+
+Para validar e preparar os arquivos:
+
+```powershell
+npm test
+npm run build
+$env:NODE_ENV = 'production'
+npm start
+```
+
+O build gera `frontend/dist/`. O servidor continua necessário para encaminhar
+as chamadas à API; não basta publicar esses arquivos em hospedagem estática.
+Para acesso externo, configure HTTPS e um proxy de implantação adequado.

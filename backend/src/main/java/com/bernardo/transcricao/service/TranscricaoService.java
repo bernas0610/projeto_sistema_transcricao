@@ -10,6 +10,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Path;
 import java.util.UUID;
+import com.bernardo.transcricao.dto.TranscricaoResponse;
+import com.bernardo.transcricao.dto.TranscricoesPage;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +40,16 @@ public class TranscricaoService {
     public Transcricao buscar(UUID id, UUID usuarioId) {
         return repository.findByIdAndUsuarioId(id, usuarioId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Transcrição não encontrada"));
+    }
+
+    public TranscricoesPage listar(UUID usuarioId, int pagina) {
+        if (pagina < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Página deve ser positiva ou zero");
+        }
+        var resultado = repository.findAllByUsuarioId(usuarioId,
+                PageRequest.of(pagina, 20, Sort.by(Sort.Direction.DESC, "criadoEm", "id")));
+        return new TranscricoesPage(resultado.map(TranscricaoResponse::from).getContent(), pagina,
+                resultado.getTotalPages(), resultado.getTotalElements());
     }
 
 }

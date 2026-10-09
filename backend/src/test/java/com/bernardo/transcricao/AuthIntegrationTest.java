@@ -265,6 +265,30 @@ class AuthIntegrationTest {
         return usuarios.cadastrar(new CadastroRequest(email, "senha12345"));
     }
 
+    @Test
+    void historicoPaginadoMostraSomenteTranscricoesDoDono() throws Exception {
+        Usuario dono = cadastrar("dono@example.com");
+        Usuario outro = cadastrar("outro@example.com");
+        for (int i = 0; i < 22; i++) {
+            Transcricao job = new Transcricao();
+            job.setUsuarioId(dono.getId());
+            job.setNomeArquivoOriginal("aula-" + i + ".mp3");
+            job.setCaminhoArquivo("target/aula.mp3");
+            transcricoes.saveAndFlush(job);
+        }
+        registro.registrar("privada.mp3", Path.of("target/privada.mp3"), outro.getId());
+        MockHttpSession sessao = login(dono.getEmail());
+        mvc.perform(get("/transcricoes").session(sessao)).andExpect(status().isOk())
+                .andExpect(jsonPath("total").value(22)).andExpect(jsonPath("totalPaginas").value(2))
+                .andExpect(jsonPath("itens.length()").value(20));
+        mvc.perform(get("/transcricoes?pagina=1").session(sessao)).andExpect(status().isOk())
+                .andExpect(jsonPath("itens.length()").value(2));
+        mvc.perform(get("/transcricoes").session(login(outro.getEmail()))).andExpect(status().isOk())
+                .andExpect(jsonPath("total").value(1)).andExpect(jsonPath("itens[0].nomeArquivoOriginal").value("privada.mp3"));
+        mvc.perform(get("/transcricoes?pagina=-1").session(sessao)).andExpect(status().isBadRequest());
+        mvc.perform(get("/transcricoes")).andExpect(status().isUnauthorized());
+    }
+
     private MockHttpSession loginAdmin() throws Exception {
         Usuario admin = cadastrar("admin@example.com");
         admin.setRole(RoleUsuario.ADMIN);
