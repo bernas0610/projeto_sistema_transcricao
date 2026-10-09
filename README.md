@@ -1,5 +1,38 @@
 # projeto_sistema_transcricao
 
+## Estrutura do repositório
+
+```text
+projeto_sistema_transcricao/
+├── backend/
+│   ├── .mvn/wrapper/
+│   ├── src/
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   └── pom.xml
+├── .gitattributes
+├── .gitignore
+└── README.md
+```
+
+O projeto Spring Boot e o Maven Wrapper ficam em `backend/`. Execute os comandos
+Maven a partir dessa pasta. O front-end será adicionado separadamente.
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+Configure `DB_PASSWORD` e `GEMINI_API_KEY` no ambiente de execução. No IntelliJ,
+importe `backend/pom.xml` e use `backend/` como diretório de trabalho.
+
+Os uploads persistentes ficam, por padrão, em `uploads/` na raiz do repositório,
+fora do Git. O backend acessa essa pasta como `../uploads`, preservando os dados
+e os caminhos absolutos já gravados no banco antes da reorganização. Para usar
+outro local, configure `APP_UPLOAD_DIR`, preferencialmente com um caminho absoluto.
+Relatórios locais de testes anteriores em `target/` também não são versionados;
+novos builds e relatórios ficam em `backend/target/`.
+
 ## Recuperação após reinício
 
 Ao terminar a inicialização, a aplicação reenfileira as transcrições `PENDENTE`
@@ -83,5 +116,6 @@ Os testes de autenticação executam as migrations em H2 com modo PostgreSQL e
 substituem o processador e o provedor para não consumir cota externa:
 
 ```powershell
+cd backend
 .\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest' test
 ```
