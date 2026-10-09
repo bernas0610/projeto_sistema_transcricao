@@ -53,7 +53,7 @@ public class CotaUsuarioService {
     public UsuarioResponse consultar(UUID id) {
         Usuario usuario = repository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário não encontrado"));
-        return new UsuarioResponse(id, usuario.getEmail(), limite, usadasHoje(usuario, LocalDate.now(clock)));
+        return new UsuarioResponse(id, usuario.getEmail(), usuario.getRole(), limite, usadasHoje(usuario, LocalDate.now(clock)));
     }
 
     private int usadasHoje(Usuario usuario, LocalDate hoje) {

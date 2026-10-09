@@ -25,7 +25,7 @@ public class SecurityConfig {
     @Bean
     UserDetailsService userDetailsService(UsuarioRepository repository) {
         return email -> repository.findByEmail(email.strip().toLowerCase(Locale.ROOT))
-                .map(u -> new UsuarioPrincipal(u.getId(), u.getEmail(), u.getSenhaHash()))
+                .map(u -> new UsuarioPrincipal(u.getId(), u.getEmail(), u.getSenhaHash(), u.getRole()))
                 .orElseThrow(() -> new UsernameNotFoundException("Credenciais inválidas"));
     }
 
@@ -35,7 +35,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/cadastro", "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/cadastro").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

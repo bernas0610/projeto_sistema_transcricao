@@ -1,6 +1,9 @@
 package com.bernardo.transcricao;
 
 import com.bernardo.transcricao.dto.CadastroRequest;
+import com.bernardo.transcricao.config.AdminBootstrap;
+import com.bernardo.transcricao.model.RoleUsuario;
+import jakarta.validation.Validator;
 import com.bernardo.transcricao.model.Transcricao;
 import com.bernardo.transcricao.model.Usuario;
 import com.bernardo.transcricao.provider.TranscriptionProvider;
@@ -41,7 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa", "spring.datasource.password=",
         "app.armazenamento.diretorio=target/test-uploads",
-        "app.uso.limite-arquivos-diario=5"})
+        "app.uso.limite-arquivos-diario=5",
+        "app.admin.email=", "app.admin.senha="})
 @AutoConfigureMockMvc
 class AuthIntegrationTest {
     @Autowired MockMvc mvc;
@@ -50,6 +54,7 @@ class AuthIntegrationTest {
     @Autowired TranscricaoRepository transcricoes;
     @Autowired TranscricaoRegistroService registro;
     @Autowired PasswordEncoder encoder;
+    @Autowired Validator validator;
     @MockitoBean TranscriptionProvider provider;
     @MockitoBean TranscricaoProcessor processor;
 
@@ -71,10 +76,11 @@ class AuthIntegrationTest {
 
     @Test
     void cadastroProtegeSenhaENormalizaEmail() throws Exception {
-        mvc.perform(post("/auth/cadastro").with(csrf()).contentType("application/json")
+        mvc.perform(post("/auth/cadastro").session(loginAdmin()).with(csrf()).contentType("application/json")
                         .content("{\"email\":\"Teste@EXAMPLE.COM\",\"senha\":\"senha12345\"}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("email").value("teste@example.com"))
                 .andExpect(jsonPath("limiteArquivosDiario").value(5))
+                .andExpect(jsonPath("role").value("USER"))
                 .andExpect(jsonPath("senhaHash").doesNotExist()).andExpect(jsonPath("senha").doesNotExist());
         Usuario salvo = usuarioRepository.findByEmail("teste@example.com").orElseThrow();
         assertNotEquals("senha12345", salvo.getSenhaHash());
@@ -84,20 +90,21 @@ class AuthIntegrationTest {
     @Test
     void cadastroDuplicadoRetorna409() throws Exception {
         cadastrar("teste@example.com");
-        mvc.perform(post("/auth/cadastro").with(csrf()).contentType("application/json")
+        mvc.perform(post("/auth/cadastro").session(loginAdmin()).with(csrf()).contentType("application/json")
                         .content("{\"email\":\"TESTE@example.com\",\"senha\":\"senha12345\"}"))
                 .andExpect(status().isConflict());
-        assertEquals(1, usuarioRepository.count());
+        assertEquals(2, usuarioRepository.count());
     }
 
     @Test
     void rejeitaSenhaCurtaESenhaAcimaDoLimiteEmBytes() throws Exception {
+        MockHttpSession admin = loginAdmin();
         for (String senha : List.of("123", "á".repeat(40))) {
-            mvc.perform(post("/auth/cadastro").with(csrf()).contentType("application/json")
+            mvc.perform(post("/auth/cadastro").session(admin).with(csrf()).contentType("application/json")
                             .content("{\"email\":\"teste@example.com\",\"senha\":\"" + senha + "\"}"))
                     .andExpect(status().isBadRequest());
         }
-        assertEquals(0, usuarioRepository.count());
+        assertEquals(1, usuarioRepository.count());
     }
 
     @Test
@@ -256,6 +263,92 @@ class AuthIntegrationTest {
 
     private Usuario cadastrar(String email) {
         return usuarios.cadastrar(new CadastroRequest(email, "senha12345"));
+    }
+
+    private MockHttpSession loginAdmin() throws Exception {
+        Usuario admin = cadastrar("admin@example.com");
+        admin.setRole(RoleUsuario.ADMIN);
+        usuarioRepository.saveAndFlush(admin);
+        return login(admin.getEmail());
+    }
+
+    @Test
+    void visitanteNaoPodeCriarUsuarioMesmoComCsrf() throws Exception {
+        mvc.perform(post("/auth/cadastro").with(csrf()).contentType("application/json")
+                        .content("{\"email\":\"novo@example.com\",\"senha\":\"senha12345\"}"))
+                .andExpect(status().isUnauthorized());
+        assertEquals(0, usuarioRepository.count());
+    }
+
+    @Test
+    void usuarioComumNaoPodeCriarOutrosUsuarios() throws Exception {
+        cadastrar("comum@example.com");
+        MockHttpSession comum = login("comum@example.com");
+        mvc.perform(post("/auth/cadastro").session(comum).with(csrf()).contentType("application/json")
+                        .content("{\"email\":\"novo@example.com\",\"senha\":\"senha12345\"}"))
+                .andExpect(status().isForbidden());
+        assertEquals(1, usuarioRepository.count());
+        mvc.perform(get("/auth/me").session(comum)).andExpect(status().isOk())
+                .andExpect(jsonPath("role").value("USER"));
+    }
+
+    @Test
+    void adminNaoPodeCriarOutroAdminPeloCadastro() throws Exception {
+        MockHttpSession admin = loginAdmin();
+        mvc.perform(get("/auth/me").session(admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("role").value("ADMIN"));
+        mvc.perform(post("/auth/cadastro").session(admin).with(csrf()).contentType("application/json")
+                        .content("{\"email\":\"novo@example.com\",\"senha\":\"senha12345\",\"role\":\"ADMIN\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("role").value("USER"));
+        assertEquals(RoleUsuario.USER, usuarioRepository.findByEmail("novo@example.com").orElseThrow().getRole());
+    }
+
+    @Test
+    void adminTambemPrecisaDeCsrfParaCadastrar() throws Exception {
+        mvc.perform(post("/auth/cadastro").session(loginAdmin()).contentType("application/json")
+                        .content("{\"email\":\"novo@example.com\",\"senha\":\"senha12345\"}"))
+                .andExpect(status().isForbidden());
+        assertEquals(1, usuarioRepository.count());
+    }
+
+    @Test
+    void primeiroAdminTemSenhaProtegidaENaoERecriado() throws Exception {
+        AdminBootstrap bootstrap = new AdminBootstrap(usuarioRepository, usuarios, validator,
+                "Primeiro@example.com", "senha12345");
+        bootstrap.run(null);
+        Usuario admin = usuarioRepository.findByEmail("primeiro@example.com").orElseThrow();
+        assertEquals(RoleUsuario.ADMIN, admin.getRole());
+        assertTrue(encoder.matches("senha12345", admin.getSenhaHash()));
+        new AdminBootstrap(usuarioRepository, usuarios, validator, "outro@example.com", "outrasenha123").run(null);
+        assertEquals(1, usuarioRepository.count());
+        assertEquals(admin.getSenhaHash(), usuarioRepository.findById(admin.getId()).orElseThrow().getSenhaHash());
+        mvc.perform(get("/auth/me").session(login("primeiro@example.com")))
+                .andExpect(status().isOk()).andExpect(jsonPath("role").value("ADMIN"));
+    }
+
+    @Test
+    void bootstrapNaoPromoveUsuarioComumExistente() {
+        Usuario comum = cadastrar("comum@example.com");
+        assertThrows(IllegalStateException.class, () -> new AdminBootstrap(usuarioRepository, usuarios, validator,
+                comum.getEmail(), "senha12345").run(null));
+        assertEquals(RoleUsuario.USER, usuarioRepository.findById(comum.getId()).orElseThrow().getRole());
+    }
+
+    @Test
+    void bootstrapNaoCriaAdminSemConfiguracao() {
+        new AdminBootstrap(usuarioRepository, usuarios, validator, "", "").run(null);
+        assertEquals(0, usuarioRepository.count());
+    }
+
+    @Test
+    void bootstrapRejeitaCredenciaisInvalidasSemCriarConta() {
+        for (CadastroRequest request : List.of(new CadastroRequest("admin@example.com", ""),
+                new CadastroRequest("invalido", "senha12345"),
+                new CadastroRequest("admin@example.com", "123"))) {
+            assertThrows(IllegalStateException.class, () -> new AdminBootstrap(usuarioRepository, usuarios, validator,
+                    request.email(), request.senha()).run(null));
+        }
+        assertEquals(0, usuarioRepository.count());
     }
 
     private MockHttpSession login(String email) throws Exception {

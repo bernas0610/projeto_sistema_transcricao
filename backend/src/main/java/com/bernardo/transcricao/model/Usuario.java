@@ -24,6 +24,10 @@ public class Usuario {
     @Column(name = "senha_hash", nullable = false, length = 255)
     private String senhaHash;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RoleUsuario role = RoleUsuario.USER;
+
     @Column(name = "dia_uso")
     private LocalDate diaUso;
 

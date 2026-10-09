@@ -70,7 +70,10 @@ não há um número diário fixo no código. Consulte a
 
 ## Contas e limite por usuário
 
-Novos uploads e consultas exigem login. Cada transcrição nova pertence ao usuário
+Novos uploads e consultas exigem login. Apenas administradores (`ADMIN`) podem
+criar usuários pelo `POST /auth/cadastro`; visitantes recebem `401` e usuários
+comuns (`USER`) recebem `403`. Esse endpoint sempre cria um usuário comum,
+mesmo que o JSON tente enviar um campo `role`. Cada transcrição nova pertence ao usuário
 autenticado; consultar um ID de outro usuário retorna `404`. Transcrições anteriores
 à migration V2 continuam no banco, sem dono, e não podem ser consultadas pela API.
 Para disponibilizá-las, associe seus IDs explicitamente a uma conta pelo banco.
@@ -93,15 +96,19 @@ garantem disponibilidade de cota para transcrevê-los no mesmo dia.
 A autenticação usa sessão (`JSESSIONID`), senhas BCrypt e proteção CSRF mantida
 pelo Spring Security. O cliente deve preservar o cookie entre as requisições.
 
+Antes de criar usuários, configure e autentique o primeiro administrador conforme
+a seção abaixo. O cadastro público está fechado.
+
 1. `GET /auth/csrf`: retorna `token`, `headerName` e `parameterName`. Envie o token
    no header indicado em todos os POSTs, incluindo cadastro, login e logout.
-2. `POST /auth/cadastro`: JSON `{"email":"voce@example.com","senha":"senha12345"}`.
+2. Com uma sessão de administrador, `POST /auth/cadastro`: JSON
+   `{"email":"voce@example.com","senha":"senha12345"}`.
    Retorna `201`; e-mail duplicado retorna `409`. A senha precisa ter 8 a 72 caracteres
    e no máximo 72 bytes UTF-8. Cadastrar não efetua login automaticamente.
 3. `POST /auth/login`: formulário `application/x-www-form-urlencoded` com
    `email` e `password`. Retorna `204` no sucesso ou `401` para credenciais inválidas.
 4. Consulte `/auth/csrf` novamente após o login, pois o token anterior é renovado.
-5. `GET /auth/me`: retorna ID, e-mail, `limiteArquivosDiario` e `arquivosEnviadosHoje`.
+5. `GET /auth/me`: retorna ID, e-mail, `role`, `limiteArquivosDiario` e `arquivosEnviadosHoje`.
 6. `POST /transcricoes`: multipart com `arquivo`, cookie de sessão e header CSRF.
    `GET /transcricoes/{id}` consulta somente uma transcrição da própria conta.
 7. `POST /auth/logout`: encerra a sessão (`204`). Obtenha outro token antes de novo login.
@@ -109,6 +116,33 @@ pelo Spring Security. O cliente deve preservar o cookie entre as requisições.
 Em produção, sirva a aplicação em HTTPS e configure
 `server.servlet.session.cookie.secure=true`. Sessões são locais à aplicação e
 precisam de um novo login após reiniciá-la; os jobs persistidos continuam recuperáveis.
+
+### Primeiro administrador
+
+A migration V3 adiciona os perfis `USER` e `ADMIN`. Todas as contas existentes
+recebem `USER`; nenhuma conta é promovida automaticamente. O admin mantém o
+limite diário de cinco arquivos e consulta apenas suas próprias transcrições.
+Sua permissão adicional nesta etapa é criar usuários comuns.
+
+Na primeira inicialização, configure `ADMIN_EMAIL` e `ADMIN_PASSWORD` no ambiente
+da aplicação (por exemplo, nas variáveis da execução do IntelliJ). Use um e-mail
+novo e uma senha de 8 a 72 caracteres, com até 72 bytes UTF-8. Não coloque essas
+credenciais no repositório. Em seguida, execute o backend normalmente.
+
+Se não houver admin, essas variáveis criam o primeiro com senha BCrypt. Sem as
+variáveis, a aplicação inicia sem criar admin e o cadastro permanece restrito.
+Configuração incompleta ou inválida impede a inicialização para que seja corrigida.
+Se o e-mail já pertencer a um usuário comum, a inicialização recusa a promoção;
+escolha um e-mail novo.
+
+Depois de criado, remova `ADMIN_EMAIL` e `ADMIN_PASSWORD` da configuração local.
+O admin fica persistido no banco. Reiniciar não recria a conta nem altera sua
+senha, e o bootstrap não cria outro admin enquanto já houver um. Não existe
+endpoint para criar administradores ou promover usuários.
+
+Para cadastrar uma pessoa: obtenha CSRF, faça login com o admin, obtenha o novo
+CSRF e envie o JSON de cadastro usando a mesma sessão. A nova pessoa poderá
+entrar com o e-mail e a senha definidos pelo admin.
 
 ### Testes locais sem Gemini ou PostgreSQL
 

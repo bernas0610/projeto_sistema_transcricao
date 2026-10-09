@@ -2,6 +2,7 @@ package com.bernardo.transcricao.service;
 
 import com.bernardo.transcricao.dto.CadastroRequest;
 import com.bernardo.transcricao.model.Usuario;
+import com.bernardo.transcricao.model.RoleUsuario;
 import com.bernardo.transcricao.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +25,7 @@ public class UsuarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha deve ter no máximo 72 bytes UTF-8");
         }
         Usuario usuario = new Usuario();
+        usuario.setRole(RoleUsuario.USER);
         usuario.setEmail(request.email().strip().toLowerCase(Locale.ROOT));
         usuario.setSenhaHash(encoder.encode(request.senha()));
         try {
