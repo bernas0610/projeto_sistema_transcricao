@@ -18,15 +18,13 @@ public class TranscricaoService {
     private final TranscricaoRepository repository;
     private final ArmazenamentoService armazenamento;
     private final TranscricaoProcessor processor;
+    private final TranscricaoRegistroService registro;
 
-    public Transcricao criar(MultipartFile arquivo) {
+    public Transcricao criar(MultipartFile arquivo, UUID usuarioId) {
         Path caminho = armazenamento.salvar(arquivo);
         Transcricao salva;
         try {
-            Transcricao transcricao = new Transcricao();
-            transcricao.setNomeArquivoOriginal(limitar(arquivo.getOriginalFilename(), 255));
-            transcricao.setCaminhoArquivo(caminho.toString());
-            salva = repository.save(transcricao);
+            salva = registro.registrar(arquivo.getOriginalFilename(), caminho, usuarioId);
         } catch (RuntimeException e) {
             armazenamento.remover(caminho);
             throw e;
@@ -35,12 +33,9 @@ public class TranscricaoService {
         return salva;
     }
 
-    public Transcricao buscar(UUID id) {
-        return repository.findById(id).orElseThrow(() ->
+    public Transcricao buscar(UUID id, UUID usuarioId) {
+        return repository.findByIdAndUsuarioId(id, usuarioId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Transcrição não encontrada"));
     }
 
-    private String limitar(String texto, int max) {
-        return texto.length() > max ? texto.substring(0, max) : texto;
-    }
 }

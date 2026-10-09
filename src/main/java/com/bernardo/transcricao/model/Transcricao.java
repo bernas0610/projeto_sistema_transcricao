@@ -21,6 +21,9 @@ public class Transcricao {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "usuario_id")
+    private UUID usuarioId;
+
     @Column(name = "nome_arquivo_original", nullable = false)
     private String nomeArquivoOriginal;
 

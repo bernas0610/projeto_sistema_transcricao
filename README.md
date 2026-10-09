@@ -34,3 +34,54 @@ diária temporária. Falhas de rede e HTTP 5xx também mantêm as tentativas exi
 Os limites são do projeto/modelo no Gemini e devem ser consultados no AI Studio;
 não há um número diário fixo no código. Consulte a
 [documentação de limites](https://ai.google.dev/gemini-api/docs/rate-limits).
+
+## Contas e limite por usuário
+
+Novos uploads e consultas exigem login. Cada transcrição nova pertence ao usuário
+autenticado; consultar um ID de outro usuário retorna `404`. Transcrições anteriores
+à migration V2 continuam no banco, sem dono, e não podem ser consultadas pela API.
+Para disponibilizá-las, associe seus IDs explicitamente a uma conta pelo banco.
+A recuperação após reinício continua processando os jobs antigos.
+
+O padrão é **5 arquivos enviados por usuário por dia**, configurável em
+`app.uso.limite-arquivos-diario`. O dia renova à meia-noite no fuso
+`app.uso.fuso` (padrão: `America/Sao_Paulo`). O sexto upload retorna `429`;
+uploads inválidos ou falhas no registro não consomem a cota. Uma transcrição
+aceita conta mesmo que posteriormente falhe no processamento. Recuperar o mesmo
+job após reinício não conta como outro upload. A reserva usa bloqueio no banco
+para proteger contra uploads simultâneos.
+
+Essa cota por arquivo é independente da cota compartilhada do Gemini: um arquivo
+pode exigir várias chamadas, conforme sua duração. Cinco arquivos aceitos não
+garantem disponibilidade de cota para transcrevê-los no mesmo dia.
+
+### Fluxo de autenticação
+
+A autenticação usa sessão (`JSESSIONID`), senhas BCrypt e proteção CSRF mantida
+pelo Spring Security. O cliente deve preservar o cookie entre as requisições.
+
+1. `GET /auth/csrf`: retorna `token`, `headerName` e `parameterName`. Envie o token
+   no header indicado em todos os POSTs, incluindo cadastro, login e logout.
+2. `POST /auth/cadastro`: JSON `{"email":"voce@example.com","senha":"senha12345"}`.
+   Retorna `201`; e-mail duplicado retorna `409`. A senha precisa ter 8 a 72 caracteres
+   e no máximo 72 bytes UTF-8. Cadastrar não efetua login automaticamente.
+3. `POST /auth/login`: formulário `application/x-www-form-urlencoded` com
+   `email` e `password`. Retorna `204` no sucesso ou `401` para credenciais inválidas.
+4. Consulte `/auth/csrf` novamente após o login, pois o token anterior é renovado.
+5. `GET /auth/me`: retorna ID, e-mail, `limiteArquivosDiario` e `arquivosEnviadosHoje`.
+6. `POST /transcricoes`: multipart com `arquivo`, cookie de sessão e header CSRF.
+   `GET /transcricoes/{id}` consulta somente uma transcrição da própria conta.
+7. `POST /auth/logout`: encerra a sessão (`204`). Obtenha outro token antes de novo login.
+
+Em produção, sirva a aplicação em HTTPS e configure
+`server.servlet.session.cookie.secure=true`. Sessões são locais à aplicação e
+precisam de um novo login após reiniciá-la; os jobs persistidos continuam recuperáveis.
+
+### Testes locais sem Gemini ou PostgreSQL
+
+Os testes de autenticação executam as migrations em H2 com modo PostgreSQL e
+substituem o processador e o provedor para não consumir cota externa:
+
+```powershell
+.\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest' test
+```
