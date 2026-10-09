@@ -35,14 +35,26 @@ public class TranscricaoProcessor {
             log.warn("Transcrição {} não encontrada; nada a processar", id);
             return;
         }
+        if (transcricao.getStatus() != StatusTranscricao.PENDENTE
+                && transcricao.getStatus() != StatusTranscricao.PROCESSANDO) {
+            return;
+        }
 
-        Path original = Path.of(transcricao.getCaminhoArquivo());
-        Path pastaPartes = original.resolveSibling("partes-" + id);
+        Path pastaPartes = null;
 
         try {
+            Path original = Path.of(transcricao.getCaminhoArquivo());
+            pastaPartes = original.resolveSibling("partes-" + id);
+            if (!Files.isRegularFile(original)) {
+                throw new IOException("Arquivo de áudio original não encontrado: " + original);
+            }
             transcricao.setStatus(StatusTranscricao.PROCESSANDO);
+            transcricao.setMensagemErro(null);
+            transcricao.setTexto(null);
             repository.save(transcricao);
 
+            // Remove segmentos deixados por uma execução interrompida antes de regenerá-los.
+            apagarPasta(pastaPartes);
             log.info("Transcrição {}: dividindo o áudio", id);
             List<Path> partes = audioService.dividir(original, pastaPartes);
 
@@ -62,6 +74,11 @@ public class TranscricaoProcessor {
             apagarArquivo(original);
             log.info("Transcrição {}: concluída", id);
         } catch (Exception e) {
+            if (Thread.currentThread().isInterrupted()) {
+                // Mantém o job e o original para recuperação na próxima inicialização.
+                log.info("Transcrição {} interrompida; será recuperada no próximo início", id);
+                return;
+            }
             log.error("Transcrição {} falhou", id, e);
             transcricao.setStatus(StatusTranscricao.ERRO);
             transcricao.setMensagemErro(mensagemDe(e));
@@ -85,7 +102,7 @@ public class TranscricaoProcessor {
     }
 
     private void apagarPasta(Path pasta) {
-        if (!Files.exists(pasta)) {
+        if (pasta == null || !Files.exists(pasta)) {
             return;
         }
         try (Stream<Path> arquivos = Files.walk(pasta)) {
