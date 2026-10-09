@@ -227,13 +227,19 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
 
     // ---------- retry e utilitários ----------
 
-    private <T> T comRetry(String operacao, Supplier<T> acao) {
+    <T> T comRetry(String operacao, Supplier<T> acao) {
         for (int tentativa = 1; ; tentativa++) {
             Duration espera;
             try {
                 return acao.get();
             } catch (RestClientResponseException e) {
                 int status = e.getStatusCode().value();
+                if (status == 429 && GeminiQuotaError.cotaDiaria(e.getResponseBodyAsString())) {
+                    log.warn("Gemini: cota diária esgotada em {}; operação encerrada sem retry", operacao);
+                    throw new TranscriptionException(
+                            "Cota diária do Gemini esgotada para este projeto/modelo (HTTP 429). "
+                                    + "Tente novamente após a renovação da cota ou confira os limites no AI Studio.", e);
+                }
                 boolean transitorio = status == 429 || status >= 500;
                 if (!transitorio || tentativa >= MAX_TENTATIVAS) {
                     throw new TranscriptionException("Falha em " + operacao + " (HTTP " + status + "): "
@@ -266,7 +272,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
         return Duration.ofSeconds(10L * tentativa);
     }
 
-    private void dormir(Duration duracao) {
+    void dormir(Duration duracao) {
         try {
             Thread.sleep(duracao);
         } catch (InterruptedException e) {
