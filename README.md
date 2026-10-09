@@ -1,204 +1,228 @@
-# projeto_sistema_transcricao
+<p align="center">
+  <img src="docs/assets/voz-em-flor.svg" alt="Voz em Flor — transforme voz em palavras que ficam" width="100%">
+</p>
 
-## Estrutura do repositório
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-25-352d3d?style=flat-square" alt="Java 25">
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-352d3d?style=flat-square" alt="Spring Boot 4.1.1">
+  <img src="https://img.shields.io/badge/PostgreSQL-18-4169e1?style=flat-square" alt="PostgreSQL 18">
+  <img src="https://img.shields.io/badge/Node.js-22%2B-352d3d?style=flat-square" alt="Node.js 22 ou superior">
+  <img src="https://img.shields.io/badge/Status-em_desenvolvimento-ac6e8c?style=flat-square" alt="Em desenvolvimento">
+</p>
 
-```text
-projeto_sistema_transcricao/
-├── backend/
-│   ├── .mvn/wrapper/
-│   ├── src/
-│   ├── mvnw
-│   ├── mvnw.cmd
-│   └── pom.xml
-├── .gitattributes
-├── .gitignore
-└── README.md
+<p align="center">
+  <a href="#funcionalidades">Funcionalidades</a> ·
+  <a href="#como-executar">Como executar</a> ·
+  <a href="#arquitetura">Arquitetura</a> ·
+  <a href="#testes">Testes</a> ·
+  <a href="#documentação">Documentação</a>
+</p>
+
+# Voz em Flor
+
+**Transforme voz em palavras que ficam.**
+
+Voz em Flor é uma aplicação para transcrever áudios em português: aulas, reuniões, conversas e outras falas que você quer guardar em texto. Envie um arquivo ou grave pelo navegador, acompanhe o processamento e copie ou exporte o resultado.
+
+O projeto nasceu para uso pessoal e de amigos, e também como portfólio de desenvolvimento. Combina um backend Java com processamento assíncrono, uma interface em HTML, CSS e JavaScript e integração com a API do Gemini.
+
+## Funcionalidades
+
+| Recurso | O que você pode fazer |
+| --- | --- |
+| Upload de áudio | Enviar MP3, WAV, M4A, OGG, FLAC, AAC, WEBM, OPUS ou MPEG, com limite de 300 MB. |
+| Gravação no navegador | Gravar pelo microfone, ouvir o áudio e enviá-lo para transcrever. |
+| Processamento assíncrono | Fechar a página enquanto o backend continua trabalhando. |
+| Histórico pessoal | Consultar suas transcrições em páginas de até 20 arquivos. |
+| Texto pronto para usar | Ler, copiar e exportar a transcrição em `.txt`. |
+| Contas individuais | Acessar apenas as transcrições da própria conta. |
+| Administração | Criar usuários comuns pela interface, com uma conta `ADMIN`. |
+| Limite diário | Enviar até cinco arquivos por usuário, com renovação à meia-noite em São Paulo. |
+| Recuperação após reinício | Retomar jobs pendentes ou em processamento quando o backend reinicia. |
+| Interface responsiva | Usar a aplicação no computador ou em telas menores. |
+
+O processamento divide os áudios em partes de **15 minutos**, transcreve cada parte e reúne o resultado. O prompt atual solicita transcrição literal em português do Brasil, sem resumo e sem marcas de tempo.
+
+## Como executar
+
+### Pré-requisitos
+
+| Dependência | Requisito |
+| --- | --- |
+| Java | JDK **25**, conforme o `pom.xml`. |
+| Node.js | Versão **22 ou superior**, com npm. |
+| PostgreSQL | Servidor local disponível; o projeto foi desenvolvido com PostgreSQL 18. |
+| FFmpeg | Executável `ffmpeg` disponível no `PATH`. |
+| Gemini | Uma chave de API com acesso ao modelo configurado. |
+
+O Maven Wrapper está incluído; não é necessário instalar Maven separadamente. O frontend não tem dependências npm externas, portanto não precisa de `npm install`.
+
+Os comandos abaixo usam **PowerShell no Windows**. Em Linux ou macOS, adapte as variáveis de ambiente e use `./mvnw` no lugar de `.\mvnw.cmd`.
+
+### 1. Clone o repositório
+
+```powershell
+git clone https://github.com/bernas0610/projeto_sistema_transcricao.git
+cd projeto_sistema_transcricao
 ```
 
-O projeto Spring Boot e o Maven Wrapper ficam em `backend/`. Execute os comandos
-Maven a partir dessa pasta. O front-end será adicionado separadamente.
+### 2. Prepare o banco
+
+Com o PostgreSQL iniciado, crie um banco chamado `transcricao` pelo pgAdmin ou pelo terminal:
+
+```powershell
+psql -h localhost -U postgres -c 'CREATE DATABASE transcricao;'
+```
+
+A configuração padrão usa `localhost:5432`, banco `transcricao` e usuário `postgres`. O Flyway cria e atualiza as tabelas ao iniciar a aplicação.
+
+### 3. Configure e inicie o backend
+
+No primeiro terminal, a partir da raiz do repositório:
 
 ```powershell
 cd backend
+$env:DB_PASSWORD = 'sua_senha_do_postgres'
+$env:GEMINI_API_KEY = 'sua_chave_da_api'
+
+# Somente para criar o primeiro administrador em um banco novo:
+$env:ADMIN_EMAIL = 'admin@example.com'
+$env:ADMIN_PASSWORD = 'defina_uma_senha_forte'
+
 .\mvnw.cmd spring-boot:run
 ```
 
-Configure `DB_PASSWORD` e `GEMINI_API_KEY` no ambiente de execução. No IntelliJ,
-importe `backend/pom.xml` e use `backend/` como diretório de trabalho.
+O backend inicia em **http://localhost:8080**. Depois que o administrador for criado, remova `ADMIN_EMAIL` e `ADMIN_PASSWORD` da configuração dos próximos inícios. A conta permanece no banco; essas variáveis não alteram a senha de um admin existente.
 
-Os uploads persistentes ficam, por padrão, em `uploads/` na raiz do repositório,
-fora do Git. O backend acessa essa pasta como `../uploads`, preservando os dados
-e os caminhos absolutos já gravados no banco antes da reorganização. Para usar
-outro local, configure `APP_UPLOAD_DIR`, preferencialmente com um caminho absoluto.
-Relatórios locais de testes anteriores em `target/` também não são versionados;
-novos builds e relatórios ficam em `backend/target/`.
+Se você já tem um administrador, configure apenas o banco e a chave do Gemini. No IntelliJ, importe `backend/pom.xml`, configure as variáveis na execução de `TranscricaoApplication` e use `backend/` como diretório de trabalho.
 
-## Recuperação após reinício
+### 4. Inicie o frontend
 
-Ao terminar a inicialização, a aplicação reenfileira as transcrições `PENDENTE`
-e `PROCESSANDO`, da mais antiga para a mais recente, no executor já usado pelos
-uploads. Transcrições `CONCLUIDA` e `ERRO` não são retomadas.
-
-O processamento recomeça do início: partes temporárias antigas são removidas e
-o áudio original é dividido novamente. Chamadas ao Gemini feitas antes da queda
-podem ser repetidas e consumir cota. Ainda não há progresso salvo por parte.
-Mantenha o diretório de uploads persistente e use o mesmo diretório de trabalho
-nos reinícios, pois os caminhos dos arquivos podem ser relativos.
-
-Se o original estiver ausente, o job passa para `ERRO` com uma mensagem explicativa.
-Uma interrupção da thread durante o desligamento preserva o status recuperável;
-o original só é apagado depois de salvar a transcrição concluída.
-
-Esta recuperação pressupõe **uma única instância** da aplicação. Para executar
-várias instâncias no mesmo banco, será necessário coordenar a posse dos jobs.
-
-## Limites do Gemini
-
-Um HTTP 429 com uma violação de cota diária explícita (`QuotaFailure`, identificador
-ou métrica contendo `PerDay`/`per_day`) encerra a operação imediatamente. Mensagens
-explícitas como `daily quota` e `daily limit` também são reconhecidas. O job fica
-em `ERRO` com uma mensagem sobre a cota e o áudio original é preservado.
-Ele não é reenfileirado automaticamente quando a cota renova.
-
-Limites por minuto e respostas 429 sem indicação clara de cota diária mantêm o
-retry de até cinco tentativas. A presença de `retryDelay` não torna uma cota
-diária temporária. Falhas de rede e HTTP 5xx também mantêm as tentativas existentes.
-
-Os limites são do projeto/modelo no Gemini e devem ser consultados no AI Studio;
-não há um número diário fixo no código. Consulte a
-[documentação de limites](https://ai.google.dev/gemini-api/docs/rate-limits).
-
-## Contas e limite por usuário
-
-Novos uploads e consultas exigem login. Apenas administradores (`ADMIN`) podem
-criar usuários pelo `POST /auth/cadastro`; visitantes recebem `401` e usuários
-comuns (`USER`) recebem `403`. Esse endpoint sempre cria um usuário comum,
-mesmo que o JSON tente enviar um campo `role`. Cada transcrição nova pertence ao usuário
-autenticado; consultar um ID de outro usuário retorna `404`. Transcrições anteriores
-à migration V2 continuam no banco, sem dono, e não podem ser consultadas pela API.
-Para disponibilizá-las, associe seus IDs explicitamente a uma conta pelo banco.
-A recuperação após reinício continua processando os jobs antigos.
-
-O padrão é **5 arquivos enviados por usuário por dia**, configurável em
-`app.uso.limite-arquivos-diario`. O dia renova à meia-noite no fuso
-`app.uso.fuso` (padrão: `America/Sao_Paulo`). O sexto upload retorna `429`;
-uploads inválidos ou falhas no registro não consomem a cota. Uma transcrição
-aceita conta mesmo que posteriormente falhe no processamento. Recuperar o mesmo
-job após reinício não conta como outro upload. A reserva usa bloqueio no banco
-para proteger contra uploads simultâneos.
-
-Essa cota por arquivo é independente da cota compartilhada do Gemini: um arquivo
-pode exigir várias chamadas, conforme sua duração. Cinco arquivos aceitos não
-garantem disponibilidade de cota para transcrevê-los no mesmo dia.
-
-### Fluxo de autenticação
-
-A autenticação usa sessão (`JSESSIONID`), senhas BCrypt e proteção CSRF mantida
-pelo Spring Security. O cliente deve preservar o cookie entre as requisições.
-
-Antes de criar usuários, configure e autentique o primeiro administrador conforme
-a seção abaixo. O cadastro público está fechado.
-
-1. `GET /auth/csrf`: retorna `token`, `headerName` e `parameterName`. Envie o token
-   no header indicado em todos os POSTs, incluindo cadastro, login e logout.
-2. Com uma sessão de administrador, `POST /auth/cadastro`: JSON
-   `{"email":"voce@example.com","senha":"senha12345"}`.
-   Retorna `201`; e-mail duplicado retorna `409`. A senha precisa ter 8 a 72 caracteres
-   e no máximo 72 bytes UTF-8. Cadastrar não efetua login automaticamente.
-3. `POST /auth/login`: formulário `application/x-www-form-urlencoded` com
-   `email` e `password`. Retorna `204` no sucesso ou `401` para credenciais inválidas.
-4. Consulte `/auth/csrf` novamente após o login, pois o token anterior é renovado.
-5. `GET /auth/me`: retorna ID, e-mail, `role`, `limiteArquivosDiario` e `arquivosEnviadosHoje`.
-6. `POST /transcricoes`: multipart com `arquivo`, cookie de sessão e header CSRF.
-   `GET /transcricoes/{id}` consulta somente uma transcrição da própria conta.
-7. `POST /auth/logout`: encerra a sessão (`204`). Obtenha outro token antes de novo login.
-
-Em produção, sirva a aplicação em HTTPS e configure
-`server.servlet.session.cookie.secure=true`. Sessões são locais à aplicação e
-precisam de um novo login após reiniciá-la; os jobs persistidos continuam recuperáveis.
-
-### Primeiro administrador
-
-A migration V3 adiciona os perfis `USER` e `ADMIN`. Todas as contas existentes
-recebem `USER`; nenhuma conta é promovida automaticamente. O admin mantém o
-limite diário de cinco arquivos e consulta apenas suas próprias transcrições.
-Sua permissão adicional nesta etapa é criar usuários comuns.
-
-Na primeira inicialização, configure `ADMIN_EMAIL` e `ADMIN_PASSWORD` no ambiente
-da aplicação (por exemplo, nas variáveis da execução do IntelliJ). Use um e-mail
-novo e uma senha de 8 a 72 caracteres, com até 72 bytes UTF-8. Não coloque essas
-credenciais no repositório. Em seguida, execute o backend normalmente.
-
-Se não houver admin, essas variáveis criam o primeiro com senha BCrypt. Sem as
-variáveis, a aplicação inicia sem criar admin e o cadastro permanece restrito.
-Configuração incompleta ou inválida impede a inicialização para que seja corrigida.
-Se o e-mail já pertencer a um usuário comum, a inicialização recusa a promoção;
-escolha um e-mail novo.
-
-Depois de criado, remova `ADMIN_EMAIL` e `ADMIN_PASSWORD` da configuração local.
-O admin fica persistido no banco. Reiniciar não recria a conta nem altera sua
-senha, e o bootstrap não cria outro admin enquanto já houver um. Não existe
-endpoint para criar administradores ou promover usuários.
-
-Para cadastrar uma pessoa: obtenha CSRF, faça login com o admin, obtenha o novo
-CSRF e envie o JSON de cadastro usando a mesma sessão. A nova pessoa poderá
-entrar com o e-mail e a senha definidos pelo admin.
-
-### Testes locais sem Gemini ou PostgreSQL
-
-Os testes de autenticação executam as migrations em H2 com modo PostgreSQL e
-substituem o processador e o provedor para não consumir cota externa:
-
-```powershell
-cd backend
-.\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest' test
-```
-
-## Frontend — Voz em Flor
-
-A interface fica em `frontend/`, separada do projeto Maven em `backend/`.
-O visual segue o protótipo Voz em Flor, com versão para computador e celular.
-Inclui login, upload com progresso, gravação pelo microfone, histórico paginado,
-acompanhamento de status, cópia e download do texto e cadastro de usuários pelo admin.
-
-Com o backend rodando na porta 8080, abra outro terminal na raiz do repositório:
+Abra **outro terminal**, também na raiz do repositório:
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-Acesse http://localhost:5173 e entre com uma conta já cadastrada. É necessário
-Node.js 22 ou superior; o frontend usa HTML, CSS e JavaScript sem dependências
-externas. Não há cadastro público: o admin cria os acessos na aba Usuários.
+Acesse **[http://localhost:5173](http://localhost:5173)** e entre com as credenciais do administrador que você configurou. Mantenha os dois processos rodando.
 
-O servidor Node encaminha `/auth/*` e `/transcricoes` ao Spring Boot, preservando
-cookie de sessão, CSRF e multipart. Abra a interface pelo servidor, não diretamente
-pelo arquivo HTML. Para outra porta do backend, configure `API_TARGET` antes de iniciar:
+### 5. Faça sua primeira transcrição
 
-```powershell
-$env:API_TARGET = 'http://localhost:8081'
-npm run dev
+1. Escolha um áudio curto para o primeiro teste ou use **Gravar agora**.
+2. Clique em **Transcrever áudio**.
+3. Acompanhe o status em **Minhas transcrições**.
+4. Quando concluir, abra o texto e use **Copiar** ou **Exportar**.
+
+Para liberar acesso a outra pessoa, entre como admin e abra **Usuários → Criar usuário**. O cadastro público está fechado. A gravação requer permissão de microfone e um navegador com MediaRecorder, em `localhost` ou HTTPS.
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    A[Interface no navegador] --> B[Servidor Node.js e proxy]
+    B --> C[API Spring Boot]
+    C --> D[(PostgreSQL)]
+    C --> E[Processamento assíncrono]
+    E --> F[FFmpeg: partes de 15 min]
+    F --> G[API do Gemini]
+    E --> D
 ```
 
-O limite de upload é 300 MB, igual ao backend. A gravação requer permissão de
-microfone e um navegador com MediaRecorder, em localhost ou HTTPS. Gravar não
-consome cota; enviar o áudio consome um dos cinco arquivos diários. O status é
-consultado a cada cinco segundos enquanto há jobs pendentes na página atual.
+O servidor Node entrega a interface e encaminha as chamadas da API para o backend na mesma origem, preservando o cookie de sessão e a proteção CSRF. O Spring Boot registra os jobs e executa o processamento em segundo plano. O PostgreSQL guarda contas, status e textos; os áudios são armazenados temporariamente no disco local.
 
-`GET /transcricoes?pagina=0` retorna `itens`, `pagina`, `totalPaginas` e `total`,
-com até 20 transcrições da própria conta por página, ordenadas da mais recente
-para a mais antiga. A numeração começa em zero.
+| Camada | Tecnologias |
+| --- | --- |
+| Backend | Java 25, Spring Boot 4.1.1, Spring Security, Spring Data JPA, Bean Validation e Lombok. |
+| Dados | PostgreSQL e migrations Flyway. |
+| Áudio e IA | FFmpeg, API do Gemini e interface `TranscriptionProvider`. |
+| Frontend | HTML, CSS, JavaScript com ES Modules e servidor HTTP nativo do Node.js. |
+| Testes | JUnit, Spring Security Test, H2 e test runner nativo do Node.js. |
 
-Para validar e preparar os arquivos:
+### Organização do repositório
+
+```text
+projeto_sistema_transcricao/
+├── backend/
+│   ├── src/main/java/          # API, segurança, serviços e provedor de transcrição
+│   ├── src/main/resources/     # Configuração e migrations Flyway
+│   ├── src/test/               # Testes do backend
+│   ├── .mvn/                  # Maven Wrapper
+│   └── pom.xml
+├── frontend/
+│   ├── public/                # Interface: HTML, CSS e JavaScript
+│   ├── test/                  # Testes de validação e do proxy HTTP
+│   ├── server.mjs             # Servidor local e encaminhamento à API
+│   └── build.mjs              # Prepara os arquivos em dist/
+├── docs/                      # Guia técnico e recursos do README
+├── uploads/                   # Áudios locais; criado em execução e ignorado pelo Git
+└── README.md
+```
+
+## Configuração
+
+| Variável | Finalidade | Padrão |
+| --- | --- | --- |
+| `DB_PASSWORD` | Senha do usuário PostgreSQL. | Obrigatória. |
+| `GEMINI_API_KEY` | Chave para transcrever pela API. | Necessária para transcrição. |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Criação do primeiro admin. | Opcionais após o primeiro cadastro. |
+| `APP_UPLOAD_DIR` | Diretório persistente dos áudios. | `../uploads`, a partir de `backend/`. |
+| `API_TARGET` | Endereço do backend usado pelo frontend. | `http://localhost:8080`. |
+| `PORT` | Porta do servidor frontend. | `5173`. |
+| `NODE_ENV` | Use `production` para servir o build. | Serve `public/` quando não é `production`. |
+
+Modelo, duração das partes, número de threads e cota diária ficam em [`application.properties`](backend/src/main/resources/application.properties). Para outro banco ou usuário, configure `SPRING_DATASOURCE_URL` e `SPRING_DATASOURCE_USERNAME`. Configure as credenciais no ambiente; arquivos `.env` não são carregados automaticamente pelo projeto.
+
+## Testes
+
+Execute a suíte isolada do backend a partir de `backend/`:
+
+```powershell
+.\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest' test
+```
+
+Essa seleção usa H2 e substitutos do provedor e do processador nos testes de integração; não envia áudio ao Gemini nem depende de PostgreSQL. Os testes de divisão de áudio usam FFmpeg e são ignorados quando o executável não está disponível.
+
+A partir de `frontend/`, execute:
 
 ```powershell
 npm test
 npm run build
-$env:NODE_ENV = 'production'
-npm start
 ```
 
-O build gera `frontend/dist/`. O servidor continua necessário para encaminhar
-as chamadas à API; não basta publicar esses arquivos em hospedagem estática.
-Para acesso externo, configure HTTPS e um proxy de implantação adequado.
+Os testes verificam isolamento entre contas, permissões, cota, recuperação de jobs, tratamento de falhas do Gemini, divisão do áudio, validação de arquivos, escape de HTML e preservação de sessão, CSRF e multipart pelo proxy.
+
+## Limites e comportamento atual
+
+- **Cinco arquivos por usuário/dia:** um upload aceito conta mesmo que a transcrição falhe depois. Gravar sem enviar e recuperar um job não consomem outro arquivo.
+- **Cota compartilhada do Gemini:** o limite por usuário é independente do limite da API. Um áudio de 90 minutos exige seis partes; custos e disponibilidade dependem da conta e do modelo utilizado.
+- **Recuperação desde o início:** jobs interrompidos podem repetir chamadas ao Gemini. Jobs em `ERRO` não são retomados automaticamente.
+- **Uma instância de backend:** ainda não há coordenação de jobs entre várias instâncias.
+- **Texto gerado por IA:** a transcrição pode conter erros ou omissões; revise trechos importantes. A configuração atual não inclui timestamps nem identificação estruturada de falantes.
+- **Áudio enviado ao provedor:** as partes são transmitidas ao Gemini para transcrição. O backend remove o original após salvar o texto concluído e o preserva em caso de falha.
+
+O projeto está em desenvolvimento e a execução documentada é local. Para publicar, configure HTTPS, persistência dos dados e cookie de sessão seguro. O build do frontend precisa de um servidor que encaminhe a API; hospedagem apenas estática não é suficiente para o fluxo atual.
+
+## Problemas comuns
+
+| Sintoma | O que verificar |
+| --- | --- |
+| `ERR_CONNECTION_REFUSED` na porta 5173 | Execute `npm run dev` em `frontend/` e mantenha o terminal aberto. |
+| Interface abre, mas não conecta ao backend | Inicie o Spring Boot na porta 8080 ou ajuste `API_TARGET`. |
+| Falha ao conectar ao banco | Confira PostgreSQL, banco `transcricao`, usuário e `DB_PASSWORD`. |
+| Áudio falha no processamento | Confira FFmpeg no `PATH`, chave do Gemini e mensagem do job. |
+| Limite diário atingido | Aguarde a renovação da cota correspondente: usuário ou provedor. |
+
+## Documentação
+
+| Documento | Conteúdo |
+| --- | --- |
+| [00 — Arquitetura](docs/00-ARQUITETURA.md) | Componentes, fluxo de processamento, decisões técnicas, operação e configuração no Windows. |
+| [01 — Modelo de dados](docs/01-MODELO%20DE%20DADOS.md) | Entidades, relacionamentos, colunas, migrations e regras da cota diária. |
+| [02 — Contrato da API](docs/02-CONTRATO%20DA%20API.md) | Endpoints, autenticação, CSRF, formatos de entrada/saída e códigos HTTP. |
+| [03 — SLA e reengajamento](docs/03-SLA%20e%20reengajamento.md) | Comportamento atual, retorno ao fluxo e indicadores propostos, sem prometer um SLA existente. |
+| [04 — Backlog](docs/04-BACKLOG.md) | Entregas, validações pendentes, prioridades sugeridas e decisões em aberto. |
+
+---
+
+Desenvolvido por **[Bernardo Mendes](https://github.com/bernas0610)**.

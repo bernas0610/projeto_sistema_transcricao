@@ -1,0 +1,114 @@
+# 00 — Arquitetura
+
+[← README](../README.md) · [Modelo de dados →](01-MODELO%20DE%20DADOS.md)
+
+## Objetivo e escopo
+
+Voz em Flor transforma áudio em texto para uso pessoal e de um grupo pequeno de
+pessoas. A implementação atual é um monólito Spring Boot com interface web
+separada, servidor Node.js e integração externa com o Gemini. A execução documentada
+é local e usa uma única instância de backend.
+
+## Visão geral
+
+```mermaid
+flowchart LR
+    U[Navegador] --> N[Node.js: interface e proxy]
+    N --> A[Spring Boot: API e sessão]
+    A --> DB[(PostgreSQL)]
+    A --> FS[Disco local: uploads]
+    A --> P[Executor assíncrono]
+    P --> F[FFmpeg]
+    F --> G[Gemini]
+    P --> DB
+    P --> FS
+```
+
+| Componente | Responsabilidade |
+| --- | --- |
+| `frontend/public/` | Login, envio e gravação, histórico, leitura/exportação e criação de usuários. |
+| `frontend/server.mjs` | Entregar assets e encaminhar `/auth/*` e `/transcricoes*` ao backend, preservando sessão e CSRF. |
+| Controllers | Receber requisições, validar entradas e identificar o usuário autenticado. |
+| Spring Security | Autenticação por sessão, BCrypt, CSRF e autorização de cadastro por perfil. |
+| `TranscricaoService` | Coordenar armazenamento, registro e início do processamento; listar e consultar jobs do dono. |
+| `TranscricaoRegistroService` | Persistir o job e reservar a cota na mesma transação. |
+| `CotaUsuarioService` | Contabilizar o uso diário com bloqueio de registro no banco. |
+| `ArmazenamentoService` | Salvar originais com nomes UUID e validar arquivo vazio/extensão. |
+| `TranscricaoProcessor` | Atualizar status, dividir, transcrever, concatenar e limpar arquivos. |
+| `AudioService` | Executar FFmpeg e gerar segmentos MP3 mono de 16 kHz e 32 kbps. |
+| `TranscriptionProvider` | Definir o contrato de transcrição; a implementação atual usa Gemini. |
+| `TranscricaoRecovery` | Reenfileirar jobs interrompidos após a inicialização. |
+| `AdminBootstrap` | Criar o primeiro admin com credenciais fornecidas pelo ambiente. |
+
+## Fluxo de um upload
+
+1. O usuário entra na conta e obtém sessão e token CSRF.
+2. O navegador envia multipart com `arquivo`, passando pelo proxy Node.
+3. O backend salva o original e registra `PENDENTE`, reservando a cota diária.
+4. A API responde `202 Accepted`; o processamento segue no executor.
+5. O job passa a `PROCESSANDO`; FFmpeg divide o original em partes de 900 segundos.
+6. O provedor transcreve cada parte e o processador reúne os textos na ordem.
+7. O backend salva `CONCLUIDA` e remove o original. Falhas produzem `ERRO` e preservam o original.
+8. A interface consulta o status e permite copiar ou baixar o texto concluído.
+
+O percentual exibido no envio mede o upload, não o avanço da transcrição.
+Não existe progresso persistido por segmento.
+
+## Decisões atuais
+
+| Decisão | Motivo e consequência |
+| --- | --- |
+| Monólito Spring Boot | Mantém API, segurança e processamento no mesmo projeto. |
+| Frontend sem framework | HTML, CSS e ES Modules; sem dependências npm externas. |
+| Proxy na mesma origem | Preserva cookies e CSRF sem configurar uma integração cross-origin. |
+| PostgreSQL + Flyway | Persiste contas e jobs, com evolução explícita do schema. |
+| Arquivos no disco | Simplifica o uso local; recuperação depende do original e do caminho persistido. |
+| Uma thread de processamento | Padrão de `app.processamento.threads`; limita paralelismo, mas não impõe sozinho limite de requisições por minuto. |
+| Gemini atrás de uma interface | Permite implementar outro provedor sem mudar o contrato do processador. |
+
+## Configuração e operação
+
+Execute Maven a partir de `backend/` e Node a partir de `frontend/`. Consulte o
+[README](../README.md#configuração) para variáveis de ambiente. O modelo atualmente
+configurado é `gemini-3.5-flash`; partes, prompt, timeouts e cota ficam em
+[`application.properties`](../backend/src/main/resources/application.properties).
+
+O diretório padrão é `../uploads` a partir de `backend/`. Os caminhos gravados no
+banco são absolutos. Alterar `APP_UPLOAD_DIR` afeta novos uploads, sem migrar dados
+anteriores. Preserve banco e arquivos ao mover ou reiniciar a aplicação.
+
+O build do frontend copia assets para `frontend/dist/`:
+
+```powershell
+# A partir de frontend/
+npm run build
+$env:NODE_ENV = 'production'
+npm start
+```
+
+O servidor escuta em `127.0.0.1`. Essa configuração não publica o sistema nem habilita
+HTTPS; acesso externo exige um proxy de implantação. Em produção, use HTTPS e
+`server.servlet.session.cookie.secure=true`, além de persistência e backups.
+
+### Java no Windows
+
+Se o cliente HTTP falhar com `java.net.SocketException` relacionada ao caminho
+temporário do Windows, use um diretório curto para os sockets do JDK. A partir de
+`backend/`, com as variáveis do ambiente já configuradas:
+
+```powershell
+New-Item -ItemType Directory -Force target/tmp | Out-Null
+$socketDir = (Resolve-Path target/tmp).Path.Replace('\', '/')
+.\mvnw.cmd "-Dspring-boot.run.jvmArguments=-Djdk.net.unixdomain.tmpdir=$socketDir -Dspring.devtools.restart.enabled=false" spring-boot:run
+```
+
+No IntelliJ, use a mesma opção JVM com o caminho absoluto escolhido.
+
+## Limites da arquitetura
+
+Não há fila externa, coordenação entre instâncias, armazenamento em nuvem, sessão
+distribuída ou checkpoint por parte. Uma reinicialização exige novo login e pode
+repetir chamadas ao Gemini. Áudios são transmitidos ao provedor; isolamento entre
+usuários na API não significa processamento exclusivamente local.
+
+Evoluções planejadas estão no [backlog](04-BACKLOG.md).
