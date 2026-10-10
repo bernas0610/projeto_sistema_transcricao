@@ -93,6 +93,8 @@ Resposta `202 Accepted`, com header `Location: /transcricoes/{id}`:
   "status": "PENDENTE",
   "texto": null,
   "mensagemErro": null,
+  "totalPartes": 0,
+  "partesConcluidas": 0,
   "criadoEm": "2026-10-09T16:00:00Z",
   "atualizadoEm": "2026-10-09T16:00:00Z"
 }
@@ -106,6 +108,11 @@ Resposta `202 Accepted`, com header `Location: /transcricoes/{id}`:
 `GET /transcricoes/{id}` retorna o mesmo formato do upload. Status possíveis:
 `PENDENTE`, `PROCESSANDO`, `CONCLUIDA` e `ERRO`. A transcrição concluída inclui `texto`;
 uma falha inclui `mensagemErro`. O caminho do arquivo no servidor não é retornado.
+
+`totalPartes` começa em zero e é definido após a divisão. `partesConcluidas`
+conta trechos confirmados no banco; pode continuar positivo em um job com erro.
+Em retomadas após reinício, esses trechos são reutilizados sem nova chamada ao
+provedor. O texto parcial de cada parte não é retornado pela API.
 
 ID inexistente ou pertencente a outra conta retorna `404`, inclusive para admins.
 Não existe endpoint de reprocessamento ou download do áudio original. Copiar e

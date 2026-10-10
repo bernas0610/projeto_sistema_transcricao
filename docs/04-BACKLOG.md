@@ -16,6 +16,8 @@ para o projeto, sem datas de entrega.
 - [x] Divisão de áudio com FFmpeg em partes de 15 minutos.
 - [x] Provedor Gemini, prompt de transcrição e retries.
 - [x] Processamento assíncrono e recuperação de jobs após reinício.
+- [x] P02: checkpoints por parte no banco, duração de segmento preservada e
+  progresso no histórico/detalhe; retomada reutiliza trechos confirmados.
 - [x] Tratamento específico de cota diária explícita do Gemini.
 - [x] Autenticação por sessão, BCrypt e CSRF.
 - [x] Limite diário de cinco arquivos por usuário, com reserva transacional.
@@ -91,10 +93,16 @@ Usar conta e áudios de teste; chamadas reais ao Gemini consomem a cota do prove
 
 ## Prioridade 1 — confiabilidade e qualidade
 
+P02 foi implementado em 10/10/2026. A migration V4 foi aplicada no PostgreSQL
+local e o backend iniciou validando o schema. A suíte isolada tem 51 testes
+aprovados (47 existentes e quatro casos de checkpoint com H2), além dos sete
+testes do frontend e build aprovado. Histórico e detalhe foram conferidos com
+dados sintéticos de progresso, sem chamadas reais ao Gemini nesta etapa.
+
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |
 | P01 | Medir fidelidade da transcrição | Comparar áudio/texto de referência, registrar omissões e escolher ajustes com evidência. |
-| P02 | Progresso e checkpoint por parte | Persistir partes concluídas e retomar sem repetir partes já confirmadas. |
+| P02 — entregue | Progresso e checkpoint por parte | Partes confirmadas são reutilizadas; testes com H2 cobrem interrupção, retomada, falha e divisão incompatível. |
 | P03 | Reprocessamento de jobs com erro | Ação autenticada, sem execução duplicada; regra de cota definida e testada. |
 | P04 | Contrato de erros uniforme | Respostas previsíveis para validação, segurança e falhas; frontend trata cada causa. |
 | P05 | Observabilidade do processamento | Registrar início, fim, fila, tentativas e causa de erro sem expor credenciais ou áudio. |

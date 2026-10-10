@@ -33,6 +33,17 @@ public class AudioService {
      * Retorna as partes em ordem (parte_000.mp3, parte_001.mp3, ...).
      */
     public List<Path> dividir(Path entrada, Path diretorioSaida) {
+        return dividir(entrada, diretorioSaida, duracaoParteSegundos);
+    }
+
+    public int getDuracaoParteSegundos() {
+        return duracaoParteSegundos;
+    }
+
+    public List<Path> dividir(Path entrada, Path diretorioSaida, int duracaoSegundos) {
+        if (duracaoSegundos <= 0) {
+            throw new AudioProcessingException("A duração de cada parte deve ser positiva");
+        }
         try {
             Files.createDirectories(diretorioSaida);
         } catch (IOException e) {
@@ -45,7 +56,7 @@ public class AudioService {
                 "-vn", "-ac", "1", "-ar", "16000",
                 "-c:a", "libmp3lame", "-b:a", "32k",
                 "-f", "segment",
-                "-segment_time", String.valueOf(duracaoParteSegundos),
+                "-segment_time", String.valueOf(duracaoSegundos),
                 "-reset_timestamps", "1",
                 diretorioSaida.resolve("parte_%03d.mp3").toString()
         ));

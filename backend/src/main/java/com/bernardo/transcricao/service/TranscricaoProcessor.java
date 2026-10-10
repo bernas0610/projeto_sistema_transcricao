@@ -14,6 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -27,6 +29,7 @@ public class TranscricaoProcessor {
     private final TranscricaoRepository repository;
     private final AudioService audioService;
     private final TranscriptionProvider provider;
+    private final TranscricaoCheckpointService checkpoints;
 
     @Async("transcricaoExecutor")
     public void processar(UUID id) {
@@ -51,17 +54,40 @@ public class TranscricaoProcessor {
             transcricao.setStatus(StatusTranscricao.PROCESSANDO);
             transcricao.setMensagemErro(null);
             transcricao.setTexto(null);
+            if (transcricao.getDuracaoParteSegundos() == null) {
+                transcricao.setDuracaoParteSegundos(audioService.getDuracaoParteSegundos());
+            }
             repository.save(transcricao);
 
             // Remove segmentos deixados por uma execução interrompida antes de regenerá-los.
             apagarPasta(pastaPartes);
             log.info("Transcrição {}: dividindo o áudio", id);
-            List<Path> partes = audioService.dividir(original, pastaPartes);
+            List<Path> partes = audioService.dividir(original, pastaPartes,
+                    transcricao.getDuracaoParteSegundos());
+            Map<Integer, String> textosSalvos = new HashMap<>();
+            for (var salva : checkpoints.listar(id)) {
+                if (salva.getNumero() >= partes.size()) {
+                    throw new IOException("As partes geradas não correspondem ao progresso salvo");
+                }
+                textosSalvos.put(salva.getNumero(), salva.getTexto());
+            }
+            if (!textosSalvos.isEmpty() && transcricao.getTotalPartes() != partes.size()) {
+                throw new IOException("A divisão do áudio mudou desde o progresso salvo");
+            }
+            transcricao.setTotalPartes(partes.size());
+            transcricao.setPartesConcluidas(textosSalvos.size());
+            repository.save(transcricao);
 
             StringBuilder texto = new StringBuilder();
             for (int i = 0; i < partes.size(); i++) {
                 log.info("Transcrição {}: parte {}/{}", id, i + 1, partes.size());
-                String parte = provider.transcrever(partes.get(i), MIME_PARTES);
+                String parte = textosSalvos.get(i);
+                if (parte == null) {
+                    parte = provider.transcrever(partes.get(i), MIME_PARTES);
+                    transcricao.setPartesConcluidas(checkpoints.salvar(id, i, parte));
+                } else {
+                    log.info("Transcrição {}: parte {}/{} recuperada do banco", id, i + 1, partes.size());
+                }
                 if (!texto.isEmpty()) {
                     texto.append("\n\n");
                 }

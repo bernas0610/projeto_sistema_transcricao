@@ -40,6 +40,15 @@ public class Transcricao {
     @Column(name = "mensagem_erro", columnDefinition = "TEXT")
     private String mensagemErro;
 
+    @Column(name = "total_partes", nullable = false)
+    private int totalPartes;
+
+    @Column(name = "partes_concluidas", nullable = false)
+    private int partesConcluidas;
+
+    @Column(name = "duracao_parte_segundos")
+    private Integer duracaoParteSegundos;
+
     @CreationTimestamp
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;

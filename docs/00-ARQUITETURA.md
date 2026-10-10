@@ -43,6 +43,7 @@ flowchart LR
 | `CotaUsuarioService` | Contabilizar o uso diário com bloqueio de registro no banco. |
 | `ArmazenamentoService` | Salvar originais com nomes UUID e validar arquivo vazio/extensão. |
 | `TranscricaoProcessor` | Atualizar status, dividir, transcrever, concatenar e limpar arquivos. |
+| `TranscricaoCheckpointService` | Confirmar texto de segmento e contador na mesma transação. |
 | `AudioService` | Executar FFmpeg e gerar segmentos MP3 mono de 16 kHz e 32 kbps. |
 | `TranscriptionProvider` | Definir o contrato de transcrição; a implementação atual usa Gemini. |
 | `TranscricaoRecovery` | Reenfileirar jobs interrompidos após a inicialização. |
@@ -60,7 +61,12 @@ flowchart LR
 8. A interface consulta o status e permite copiar ou baixar o texto concluído.
 
 O percentual exibido no envio mede o upload, não o avanço da transcrição.
-Não existe progresso persistido por segmento.
+A API informa `partesConcluidas` e `totalPartes`; a interface mostra esses contadores
+no histórico e no detalhe. Cada texto de segmento e o avanço são confirmados
+na mesma transação por `TranscricaoCheckpointService`. Na recuperação, FFmpeg
+regenera os arquivos com a duração persistida no job, mas apenas os trechos
+sem checkpoint voltam ao Gemini. Uma divisão incompatível com os checkpoints
+encerra o job com erro, preservando o original e os textos já salvos.
 
 ## Decisões atuais
 
@@ -115,8 +121,8 @@ No IntelliJ, use a mesma opção JVM com o caminho absoluto escolhido.
 ## Limites da arquitetura
 
 Não há fila externa, coordenação entre instâncias, armazenamento em nuvem, sessão
-distribuída ou checkpoint por parte. Uma reinicialização exige novo login e pode
-repetir chamadas ao Gemini. Áudios são transmitidos ao provedor; isolamento entre
+distribuída. Uma reinicialização exige novo login. Chamadas que terminaram sem
+checkpoint confirmado podem ser repetidas; partes confirmadas são reutilizadas. Áudios são transmitidos ao provedor; isolamento entre
 usuários na API não significa processamento exclusivamente local.
 
 Evoluções planejadas estão no [backlog](04-BACKLOG.md).

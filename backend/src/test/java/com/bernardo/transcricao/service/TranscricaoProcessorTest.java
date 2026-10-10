@@ -24,7 +24,8 @@ class TranscricaoProcessorTest {
     private final TranscricaoRepository repository = mock(TranscricaoRepository.class);
     private final AudioService audioService = mock(AudioService.class);
     private final TranscriptionProvider provider = mock(TranscriptionProvider.class);
-    private final TranscricaoProcessor processor = new TranscricaoProcessor(repository, audioService, provider);
+    private final TranscricaoCheckpointService checkpoints = mock(TranscricaoCheckpointService.class);
+    private final TranscricaoProcessor processor = new TranscricaoProcessor(repository, audioService, provider, checkpoints);
 
     @Test
     void recuperaProcessandoLimpaPartesAntigasEConclui() throws Exception {
@@ -35,7 +36,7 @@ class TranscricaoProcessorTest {
         Files.createDirectories(pasta);
         Path antiga = Files.writeString(pasta.resolve("parte_999.mp3"), "incompleta");
         Path parte = pasta.resolve("parte_000.mp3");
-        when(audioService.dividir(original, pasta)).thenAnswer(invocation -> {
+        when(audioService.dividir(eq(original), eq(pasta), anyInt())).thenAnswer(invocation -> {
             assertFalse(Files.exists(antiga));
             Files.createDirectories(pasta);
             Files.writeString(parte, "audio");
@@ -52,7 +53,8 @@ class TranscricaoProcessorTest {
         assertNull(job.getMensagemErro());
         assertFalse(Files.exists(original));
         assertFalse(Files.exists(pasta));
-        verify(repository, times(2)).save(job);
+        verify(repository, times(3)).save(job);
+        verify(checkpoints).salvar(job.getId(), 0, "Texto recuperado");
     }
 
     @Test
@@ -80,7 +82,7 @@ class TranscricaoProcessorTest {
         Transcricao job = job(StatusTranscricao.PENDENTE);
         Path original = Files.writeString(Path.of(job.getCaminhoArquivo()), "audio");
         Path parte = tmp.resolve("parte.mp3");
-        when(audioService.dividir(eq(original), any())).thenReturn(List.of(parte));
+        when(audioService.dividir(eq(original), any(), anyInt())).thenReturn(List.of(parte));
         when(provider.transcrever(parte, "audio/mp3")).thenThrow(new TranscriptionException("Falha no Gemini"));
 
         processor.processar(job.getId());
@@ -94,7 +96,7 @@ class TranscricaoProcessorTest {
     void interrupcaoPreservaJobParaProximoInicio() throws Exception {
         Transcricao job = job(StatusTranscricao.PENDENTE);
         Path original = Files.writeString(Path.of(job.getCaminhoArquivo()), "audio");
-        when(audioService.dividir(eq(original), any())).thenAnswer(invocation -> {
+        when(audioService.dividir(eq(original), any(), anyInt())).thenAnswer(invocation -> {
             Thread.currentThread().interrupt();
             throw new TranscriptionException("Processamento interrompido");
         });

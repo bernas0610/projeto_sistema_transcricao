@@ -23,8 +23,18 @@ erDiagram
         VARCHAR status
         TEXT texto
         TEXT mensagem_erro
+        INTEGER total_partes
+        INTEGER partes_concluidas
+        INTEGER duracao_parte_segundos
         TIMESTAMPTZ criado_em
         TIMESTAMPTZ atualizado_em
+    }
+    TRANSCRICAO ||--o{ TRANSCRICAO_PARTE : salva
+    TRANSCRICAO_PARTE {
+        BIGINT id PK
+        UUID transcricao_id FK
+        INTEGER numero
+        TEXT texto
     }
 ```
 
@@ -67,6 +77,9 @@ que o processamento falhe depois; recuperar o mesmo job não altera esse contado
 | `status` | `VARCHAR(20)` | Não | Enum persistido como texto; novo job começa em `PENDENTE`. |
 | `texto` | `TEXT` | Sim | Texto consolidado após conclusão. |
 | `mensagem_erro` | `TEXT` | Sim | Motivo da falha; o processador limita a mensagem a 1.000 caracteres. |
+| `total_partes` | `INTEGER` | Não | Padrão `0`; total definido após a divisão do áudio. |
+| `partes_concluidas` | `INTEGER` | Não | Padrão `0`; quantidade de checkpoints confirmados. |
+| `duracao_parte_segundos` | `INTEGER` | Sim | Duração fixada no início do processamento e reutilizada nas retomadas. |
 | `criado_em` | `TIMESTAMP WITH TIME ZONE` | Não | Instant gerenciado pelo Hibernate na criação. |
 | `atualizado_em` | `TIMESTAMP WITH TIME ZONE` | Não | Instant gerenciado pelo Hibernate nas alterações. |
 
@@ -84,7 +97,20 @@ em cascata. A aplicação não oferece exclusão de usuários ou transcrições 
 
 O enum é validado pela aplicação; a migration não adiciona CHECK para `status`.
 O caminho permanece no registro mesmo após a remoção do original concluído.
-Não há tabela de partes, armazenamento do áudio no banco ou histórico de tentativas.
+## Tabela `transcricao_parte`
+
+Cada linha guarda o texto de um segmento confirmado. `id` é `BIGINT` identity;
+`transcricao_id` referencia o job com exclusão em cascata; `numero` é um índice
+a partir de zero; `texto` é `TEXT` obrigatório. A combinação de job e número é
+única. A gravação da parte e do contador do job ocorre na mesma transação.
+Os checkpoints permanecem após conclusão ou erro; não há endpoint que exponha
+partes separadas. O texto final concatena as partes na ordem original.
+
+O áudio não é armazenado no banco e ainda não há histórico de tentativas.
+
+Jobs anteriores à V4 recebem contadores zero e duração nula. Textos concluídos
+permanecem intactos; não são convertidos retroativamente em checkpoints.
+Jobs antigos recuperáveis começam a registrar checkpoints na próxima execução.
 
 ## Migrations
 
@@ -93,6 +119,7 @@ Não há tabela de partes, armazenamento do áudio no banco ou histórico de ten
 | V1 | `V1__criar_tabela_transcricao.sql` | Cria a tabela de transcrições. |
 | V2 | `V2__usuarios_e_donos.sql` | Cria usuários, cota diária, FK de dono e índice. |
 | V3 | `V3__roles_usuario.sql` | Adiciona perfil `USER` por padrão e CHECK de perfis. |
+| V4 | `V4__checkpoints_transcricao.sql` | Cria checkpoints e adiciona contadores e duração da divisão ao job. |
 
 O Flyway aplica as migrations e mantém sua tabela de histórico. O Hibernate usa
 `ddl-auto=validate`. Evoluções de schema devem usar novas migrations.

@@ -33,12 +33,13 @@ O projeto nasceu para uso pessoal e de amigos, e também como portfólio de dese
 | Upload de áudio | Enviar MP3, WAV, M4A, OGG, FLAC, AAC, WEBM, OPUS ou MPEG, com limite de 300 MB. |
 | Gravação no navegador | Gravar pelo microfone, ouvir o áudio e enviá-lo para transcrever. |
 | Processamento assíncrono | Fechar a página enquanto o backend continua trabalhando. |
+| Progresso por parte | Acompanhar quantos segmentos já foram confirmados no banco. |
 | Histórico pessoal | Consultar suas transcrições em páginas de até 20 arquivos. |
 | Texto pronto para usar | Ler, copiar e exportar a transcrição em `.txt`. |
 | Contas individuais | Acessar apenas as transcrições da própria conta. |
 | Administração | Criar usuários comuns pela interface, com uma conta `ADMIN`. |
 | Limite diário | Enviar até cinco arquivos por usuário, com renovação à meia-noite em São Paulo. |
-| Recuperação após reinício | Retomar jobs pendentes ou em processamento quando o backend reinicia. |
+| Recuperação após reinício | Retomar jobs pendentes ou em processamento, aproveitando partes já salvas. |
 | Interface responsiva | Usar a aplicação no computador ou em telas menores. |
 
 O processamento divide os áudios em partes de **15 minutos**, transcreve cada parte e reúne o resultado. O prompt atual solicita transcrição literal em português do Brasil, sem resumo e sem marcas de tempo.
@@ -178,7 +179,7 @@ Modelo, duração das partes, número de threads e cota diária ficam em [`appli
 Execute a suíte isolada do backend a partir de `backend/`:
 
 ```powershell
-.\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest' test
+.\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest,TranscricaoCheckpointIntegrationTest' test
 ```
 
 Essa seleção usa H2 e substitutos do provedor e do processador nos testes de integração; não envia áudio ao Gemini nem depende de PostgreSQL. Os testes de divisão de áudio usam FFmpeg e são ignorados quando o executável não está disponível.
@@ -196,7 +197,7 @@ Os testes verificam isolamento entre contas, permissões, cota, recuperação de
 
 - **Cinco arquivos por usuário/dia:** um upload aceito conta mesmo que a transcrição falhe depois. Gravar sem enviar e recuperar um job não consomem outro arquivo.
 - **Cota compartilhada do Gemini:** o limite por usuário é independente do limite da API. Um áudio de 90 minutos exige seis partes; custos e disponibilidade dependem da conta e do modelo utilizado.
-- **Recuperação desde o início:** jobs interrompidos podem repetir chamadas ao Gemini. Jobs em `ERRO` não são retomados automaticamente.
+- **Recuperação por parte:** trechos confirmados no banco são reutilizados. Uma chamada que terminou sem salvar o checkpoint ainda pode ser repetida. Jobs em `ERRO` preservam os checkpoints, mas não são retomados automaticamente.
 - **Uma instância de backend:** ainda não há coordenação de jobs entre várias instâncias.
 - **Texto gerado por IA:** a transcrição pode conter erros ou omissões; revise trechos importantes. A configuração atual não inclui timestamps nem identificação estruturada de falantes.
 - **Áudio enviado ao provedor:** as partes são transmitidas ao Gemini para transcrição. O backend remove o original após salvar o texto concluído e o preserva em caso de falha.

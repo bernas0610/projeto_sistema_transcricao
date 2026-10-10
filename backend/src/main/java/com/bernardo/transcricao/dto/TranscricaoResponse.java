@@ -12,6 +12,8 @@ public record TranscricaoResponse(
         StatusTranscricao status,
         String texto,
         String mensagemErro,
+        int totalPartes,
+        int partesConcluidas,
         Instant criadoEm,
         Instant atualizadoEm
 ) {
@@ -22,6 +24,8 @@ public record TranscricaoResponse(
                 t.getStatus(),
                 t.getTexto(),
                 t.getMensagemErro(),
+                t.getTotalPartes(),
+                t.getPartesConcluidas(),
                 t.getCriadoEm(),
                 t.getAtualizadoEm()
         );
