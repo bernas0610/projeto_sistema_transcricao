@@ -95,6 +95,10 @@ em cascata. A aplicação não oferece exclusão de usuários ou transcrições 
 | `CONCLUIDA` | Texto final salvo. |
 | `ERRO` | Execução encerrada com falha. |
 
+Reprocessamento autorizado pelo dono permite `ERRO → PENDENTE`, com bloqueio
+transacional na transcrição e validação do original. Mantém checkpoints e
+contadores, limpa a mensagem de erro e não altera a cota do usuário.
+
 O enum é validado pela aplicação; a migration não adiciona CHECK para `status`.
 O caminho permanece no registro mesmo após a remoção do original concluído.
 ## Tabela `transcricao_parte`

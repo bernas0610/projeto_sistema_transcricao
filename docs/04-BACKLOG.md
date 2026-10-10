@@ -18,6 +18,8 @@ para o projeto, sem datas de entrega.
 - [x] Processamento assíncrono e recuperação de jobs após reinício.
 - [x] P02: checkpoints por parte no banco, duração de segmento preservada e
   progresso no histórico/detalhe; retomada reutiliza trechos confirmados.
+- [x] P03: reprocessamento autenticado pelo dono, com original disponível,
+  checkpoints preservados e bloqueio de pedidos concorrentes, sem novo upload.
 - [x] Tratamento específico de cota diária explícita do Gemini.
 - [x] Autenticação por sessão, BCrypt e CSRF.
 - [x] Limite diário de cinco arquivos por usuário, com reserva transacional.
@@ -99,11 +101,17 @@ aprovados (47 existentes e quatro casos de checkpoint com H2), além dos sete
 testes do frontend e build aprovado. Histórico e detalhe foram conferidos com
 dados sintéticos de progresso, sem chamadas reais ao Gemini nesta etapa.
 
+P03 foi implementado em 10/10/2026. Os quatro novos testes de autenticação cobrem
+proprietário, CSRF, conta alheia, original ausente, estados inválidos, cota cheia
+e pedidos concorrentes. A suíte passou com 55 testes do backend e sete do frontend,
+além do build. O botão e a transição de erro para fila foram conferidos no
+navegador com respostas simuladas; nenhuma chamada real ao Gemini foi feita.
+
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |
 | P01 | Medir fidelidade da transcrição | Comparar áudio/texto de referência, registrar omissões e escolher ajustes com evidência. |
 | P02 — entregue | Progresso e checkpoint por parte | Partes confirmadas são reutilizadas; testes com H2 cobrem interrupção, retomada, falha e divisão incompatível. |
-| P03 | Reprocessamento de jobs com erro | Ação autenticada, sem execução duplicada; regra de cota definida e testada. |
+| P03 — entregue | Reprocessamento de jobs com erro | Dono reenfileira o mesmo job com original disponível; bloqueio transacional impede pedidos simultâneos e não reserva nova cota de upload. |
 | P04 | Contrato de erros uniforme | Respostas previsíveis para validação, segurança e falhas; frontend trata cada causa. |
 | P05 | Observabilidade do processamento | Registrar início, fim, fila, tentativas e causa de erro sem expor credenciais ou áudio. |
 | P06 | Backups e retenção | Definir retenção de originais com erro e procedimento de backup/restauração de banco e arquivos. |
@@ -131,7 +139,7 @@ dados sintéticos de progresso, sem chamadas reais ao Gemini nesta etapa.
 ## Decisões em aberto
 
 - Hospedagem e custos de operação.
-- Política para reprocessamento e cota em jobs com erro.
+- Reprocessamento definido: mesmo job e dono, original disponível, sem nova cota de upload; chamadas restantes continuam sujeitas à cota do provedor.
 - Retenção e exclusão de dados.
 - Necessidade de timestamps e identificação de falantes.
 - Necessidade de notificações externas e canais permitidos.

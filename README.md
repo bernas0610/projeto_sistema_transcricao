@@ -40,6 +40,7 @@ O projeto nasceu para uso pessoal e de amigos, e também como portfólio de dese
 | Administração | Criar usuários comuns pela interface, com uma conta `ADMIN`. |
 | Limite diário | Enviar até cinco arquivos por usuário, com renovação à meia-noite em São Paulo. |
 | Recuperação após reinício | Retomar jobs pendentes ou em processamento, aproveitando partes já salvas. |
+| Reprocessamento | Reenfileirar transcrições com erro, reutilizando partes salvas sem consumir outro upload diário. |
 | Interface responsiva | Usar a aplicação no computador ou em telas menores. |
 
 O processamento divide os áudios em partes de **15 minutos**, transcreve cada parte e reúne o resultado. O prompt atual solicita transcrição literal em português do Brasil, sem resumo e sem marcas de tempo.
@@ -195,9 +196,9 @@ Os testes verificam isolamento entre contas, permissões, cota, recuperação de
 
 ## Limites e comportamento atual
 
-- **Cinco arquivos por usuário/dia:** um upload aceito conta mesmo que a transcrição falhe depois. Gravar sem enviar e recuperar um job não consomem outro arquivo.
+- **Cinco arquivos por usuário/dia:** um upload aceito conta mesmo que a transcrição falhe depois. Gravar sem enviar, recuperar ou reprocessar o mesmo job não consomem outro arquivo.
 - **Cota compartilhada do Gemini:** o limite por usuário é independente do limite da API. Um áudio de 90 minutos exige seis partes; custos e disponibilidade dependem da conta e do modelo utilizado.
-- **Recuperação por parte:** trechos confirmados no banco são reutilizados. Uma chamada que terminou sem salvar o checkpoint ainda pode ser repetida. Jobs em `ERRO` preservam os checkpoints, mas não são retomados automaticamente.
+- **Recuperação por parte:** trechos confirmados no banco são reutilizados. Uma chamada que terminou sem salvar o checkpoint ainda pode ser repetida. Jobs em `ERRO` preservam os checkpoints e podem ser reenfileirados pelo dono, se o original estiver disponível.
 - **Uma instância de backend:** ainda não há coordenação de jobs entre várias instâncias.
 - **Texto gerado por IA:** a transcrição pode conter erros ou omissões; revise trechos importantes. A configuração atual não inclui timestamps nem identificação estruturada de falantes.
 - **Áudio enviado ao provedor:** as partes são transmitidas ao Gemini para transcrição. O backend remove o original após salvar o texto concluído e o preserva em caso de falha.

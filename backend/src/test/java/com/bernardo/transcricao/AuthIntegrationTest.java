@@ -381,4 +381,99 @@ class AuthIntegrationTest {
                 .andExpect(status().isNoContent()).andReturn();
         return (MockHttpSession) result.getRequest().getSession(false);
     }
+
+    @Test
+    void reprocessaMesmoJobSemNovaCotaEPreservaProgresso() throws Exception {
+        Usuario dono = cadastrar("retry@example.com");
+        Transcricao job = criarJobComErro(dono);
+        job.setTotalPartes(2);
+        job.setPartesConcluidas(1);
+        job.setDuracaoParteSegundos(900);
+        transcricoes.saveAndFlush(job);
+        dono = usuarioRepository.findById(dono.getId()).orElseThrow();
+        dono.setArquivosUsados(5);
+        usuarioRepository.saveAndFlush(dono);
+        MockHttpSession sessao = login(dono.getEmail());
+        mvc.perform(post("/transcricoes/" + job.getId() + "/reprocessar").session(sessao).with(csrf()))
+                .andExpect(status().isAccepted()).andExpect(jsonPath("status").value("PENDENTE"))
+                .andExpect(jsonPath("partesConcluidas").value(1)).andExpect(jsonPath("totalPartes").value(2));
+        assertEquals(5, usuarioRepository.findById(dono.getId()).orElseThrow().getArquivosUsados());
+        assertEquals(1, transcricoes.count());
+        assertNull(transcricoes.findById(job.getId()).orElseThrow().getMensagemErro());
+        verify(processor).processar(job.getId());
+        mvc.perform(post("/transcricoes/" + job.getId() + "/reprocessar").session(sessao).with(csrf()))
+                .andExpect(status().isConflict());
+        verify(processor, times(1)).processar(job.getId());
+    }
+
+    @Test
+    void reprocessamentoExigeDonoLoginECsrf() throws Exception {
+        Usuario dono = cadastrar("dono-retry@example.com");
+        Transcricao job = criarJobComErro(dono);
+        cadastrar("outro-retry@example.com");
+        String url = "/transcricoes/" + job.getId() + "/reprocessar";
+        mvc.perform(post(url).with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post(url).session(login(dono.getEmail()))).andExpect(status().isForbidden());
+        mvc.perform(post(url).session(login("outro-retry@example.com")).with(csrf()))
+                .andExpect(status().isNotFound());
+        mvc.perform(post(url).session(loginAdmin()).with(csrf())).andExpect(status().isNotFound());
+        assertEquals(com.bernardo.transcricao.model.StatusTranscricao.ERRO,
+                transcricoes.findById(job.getId()).orElseThrow().getStatus());
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void reprocessamentoBloqueiaOriginalAusenteEEstadosSemErro() throws Exception {
+        Usuario dono = cadastrar("estados-retry@example.com");
+        Transcricao job = criarJobComErro(dono);
+        MockHttpSession sessao = login(dono.getEmail());
+        String url = "/transcricoes/" + job.getId() + "/reprocessar";
+        for (var estado : List.of(com.bernardo.transcricao.model.StatusTranscricao.PENDENTE,
+                com.bernardo.transcricao.model.StatusTranscricao.PROCESSANDO,
+                com.bernardo.transcricao.model.StatusTranscricao.CONCLUIDA)) {
+            job.setStatus(estado);
+            transcricoes.saveAndFlush(job);
+            mvc.perform(post(url).session(sessao).with(csrf())).andExpect(status().isConflict());
+        }
+        job.setStatus(com.bernardo.transcricao.model.StatusTranscricao.ERRO);
+        transcricoes.saveAndFlush(job);
+        Files.delete(Path.of(job.getCaminhoArquivo()));
+        mvc.perform(post(url).session(sessao).with(csrf())).andExpect(status().isConflict());
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void reprocessamentosConcorrentesEnfileiramUmaVez() throws Exception {
+        Usuario dono = cadastrar("concorrente-retry@example.com");
+        Transcricao job = criarJobComErro(dono);
+        MockHttpSession sessao = login(dono.getEmail());
+        CountDownLatch inicio = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Integer> chamada = () -> {
+                inicio.await();
+                return mvc.perform(post("/transcricoes/" + job.getId() + "/reprocessar")
+                        .session(sessao).with(csrf())).andReturn().getResponse().getStatus();
+            };
+            Future<Integer> a = executor.submit(chamada), b = executor.submit(chamada);
+            inicio.countDown();
+            List<Integer> codigos = new ArrayList<>(List.of(a.get(10, TimeUnit.SECONDS), b.get(10, TimeUnit.SECONDS)));
+            codigos.sort(Integer::compareTo);
+            assertEquals(List.of(202, 409), codigos);
+            verify(processor, times(1)).processar(job.getId());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private Transcricao criarJobComErro(Usuario dono) throws Exception {
+        Path pasta = Path.of("target/test-uploads").toAbsolutePath();
+        Files.createDirectories(pasta);
+        Path original = Files.createTempFile(pasta, "retry-", ".mp3");
+        Files.writeString(original, "audio de teste");
+        Transcricao job = registro.registrar("teste.mp3", original, dono.getId());
+        job.setStatus(com.bernardo.transcricao.model.StatusTranscricao.ERRO);
+        job.setMensagemErro("Falha de teste");
+        return transcricoes.saveAndFlush(job);
+    }
 }

@@ -13,7 +13,10 @@ export function validarArquivo(file) {
 export function mensagemErro(status, body, context = '') {
   if (status === 401) return context === 'login' ? 'E-mail ou senha incorretos.' : 'Sua sessão expirou. Entre novamente.';
   if (status === 403) return 'Acesso negado ou sessão de segurança expirada. Atualize a página e tente novamente.';
-  if (status === 409) return 'Esse e-mail já está cadastrado.';
+  if (status === 409) return context === 'reprocessar'
+    ? 'Não é possível reprocessar agora. Atualize o status e confira se o áudio original ainda está disponível.'
+    : 'Esse e-mail já está cadastrado.';
+  if (status === 404 && context === 'reprocessar') return 'Transcrição não encontrada. Atualize seu histórico.';
   if (status === 429) return 'Você atingiu o limite de arquivos de hoje. Tente novamente amanhã.';
   if (status === 413) return 'O arquivo excede o limite de 300 MB.';
   if (status === 400) return 'Verifique os dados informados e tente novamente.';

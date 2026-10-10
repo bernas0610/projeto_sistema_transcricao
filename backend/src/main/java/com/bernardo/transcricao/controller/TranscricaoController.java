@@ -42,4 +42,12 @@ public class TranscricaoController {
     public TranscricaoResponse buscar(@PathVariable UUID id, @AuthenticationPrincipal UsuarioPrincipal usuario) {
         return TranscricaoResponse.from(service.buscar(id, usuario.id()));
     }
+
+    @PostMapping("/{id}/reprocessar")
+    public ResponseEntity<TranscricaoResponse> reprocessar(@PathVariable UUID id,
+            @AuthenticationPrincipal UsuarioPrincipal usuario) {
+        return ResponseEntity.accepted()
+                .location(URI.create("/transcricoes/" + id))
+                .body(TranscricaoResponse.from(service.reprocessar(id, usuario.id())));
+    }
 }

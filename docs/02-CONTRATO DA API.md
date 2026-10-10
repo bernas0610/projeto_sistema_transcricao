@@ -115,7 +115,7 @@ Em retomadas após reinício, esses trechos são reutilizados sem nova chamada a
 provedor. O texto parcial de cada parte não é retornado pela API.
 
 ID inexistente ou pertencente a outra conta retorna `404`, inclusive para admins.
-Não existe endpoint de reprocessamento ou download do áudio original. Copiar e
+Não existe endpoint de download do áudio original. Copiar e
 exportar `.txt` são operações do frontend sobre o texto recebido.
 
 `GET /transcricoes?pagina=0` retorna:
@@ -133,6 +133,20 @@ Quando há resultados, `itens` contém objetos de transcrição completos, inclu
 o texto. O tamanho é fixo em 20; a ordenação é `criadoEm DESC, id DESC`. Página
 negativa retorna `400`; o índice começa em zero.
 
+## Reprocessar uma transcrição
+
+`POST /transcricoes/{id}/reprocessar`, sem corpo, exige sessão do dono e token
+CSRF. Responde `202 Accepted`, com `Location` e o mesmo DTO de transcrição em
+`PENDENTE`. Apenas jobs em `ERRO`, com original disponível no disco, são aceitos.
+O ID, os checkpoints e a duração dos segmentos são preservados. A mensagem de
+erro é limpa; não há novo upload nem consumo adicional da cota de arquivos.
+Chamadas ao provedor para partes faltantes continuam sujeitas aos limites dele.
+
+Um bloqueio de registro serializa pedidos simultâneos: o primeiro marca
+`PENDENTE` antes de enfileirar, e os seguintes recebem `409` enquanto o job
+estiver pendente, processando ou concluído. Original indisponível também retorna
+`409`; job de outro dono ou inexistente retorna `404`, inclusive para admin.
+
 ## Falhas e respostas
 
 | Código | Casos relevantes |
@@ -141,7 +155,7 @@ negativa retorna `400`; o índice começa em zero.
 | `401` | Sessão ausente/expirada ou login inválido. |
 | `403` | Permissão insuficiente ou proteção CSRF rejeitada. |
 | `404` | Job inexistente ou de outra conta. |
-| `409` | E-mail já cadastrado. |
+| `409` | E-mail já cadastrado; reprocessamento de job fora de `ERRO` ou sem original. |
 | `413` | Limite de multipart excedido. |
 | `429` | Cota diária do usuário atingida na criação. |
 | `500` | Falha interna, como erro ao persistir ou salvar arquivo. |

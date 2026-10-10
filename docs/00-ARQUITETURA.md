@@ -68,6 +68,11 @@ regenera os arquivos com a duração persistida no job, mas apenas os trechos
 sem checkpoint voltam ao Gemini. Uma divisão incompatível com os checkpoints
 encerra o job com erro, preservando o original e os textos já salvos.
 
+O dono pode reenfileirar um job com erro pelo detalhe na interface.
+`TranscricaoRegistroService` bloqueia a linha do job, verifica estado e original
+e confirma `ERRO → PENDENTE`. Só depois do commit o serviço dispara o processador.
+Os checkpoints são mantidos, sem nova reserva de cota diária de upload.
+
 ## Decisões atuais
 
 | Decisão | Motivo e consequência |

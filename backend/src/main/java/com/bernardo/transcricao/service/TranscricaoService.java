@@ -42,6 +42,13 @@ public class TranscricaoService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Transcrição não encontrada"));
     }
 
+    public Transcricao reprocessar(UUID id, UUID usuarioId) {
+        Transcricao job = registro.prepararReprocessamento(id, usuarioId);
+        // Dispatch only after the reservation transaction has committed.
+        processor.processar(job.getId());
+        return job;
+    }
+
     public TranscricoesPage listar(UUID usuarioId, int pagina) {
         if (pagina < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Página deve ser positiva ou zero");

@@ -137,8 +137,19 @@ function renderHistory() {
 }
 function renderDetail() {
   const job = state.selected;
-  detail.innerHTML = `<div class="dialog-header"><div><h2 id="detail-title">${h(job.nomeArquivoOriginal)}</h2><p class="small muted">${h(date(job.criadoEm))} · <span class="status ${h(job.status)}">${h(STATUS[job.status])}</span></p>${progresso(job) ? `<p class="small muted">${h(progresso(job))}</p>` : ''}</div><button class="icon-button close-dialog" aria-label="Fechar transcrição">${icon('close')}</button></div>${job.status === 'CONCLUIDA' ? `<pre class="transcript">${h(job.texto || '')}</pre><div class="dialog-actions"><button class="secondary" id="copy-text">${icon('copy')} Copiar texto</button><button class="primary" id="download-text">${icon('download')} Baixar .txt</button></div>` : `<div class="processing-info">${job.status === 'ERRO' ? `<strong>Não foi possível concluir.</strong><br>${h(job.mensagemErro || 'Tente enviar novamente mais tarde.')}` : `<strong>${job.status === 'PENDENTE' ? 'Seu áudio está na fila.' : 'Estamos transcrevendo seu áudio.'}</strong><br>Você pode fechar esta janela. O status será atualizado automaticamente.`}</div>`}`;
+  detail.innerHTML = `<div class="dialog-header"><div><h2 id="detail-title">${h(job.nomeArquivoOriginal)}</h2><p class="small muted">${h(date(job.criadoEm))} · <span class="status ${h(job.status)}">${h(STATUS[job.status])}</span></p>${progresso(job) ? `<p class="small muted">${h(progresso(job))}</p>` : ''}</div><button class="icon-button close-dialog" aria-label="Fechar transcrição">${icon('close')}</button></div>${job.status === 'CONCLUIDA' ? `<pre class="transcript">${h(job.texto || '')}</pre><div class="dialog-actions"><button class="secondary" id="copy-text">${icon('copy')} Copiar texto</button><button class="primary" id="download-text">${icon('download')} Baixar .txt</button></div>` : `<div class="processing-info">${job.status === 'ERRO' ? `<strong>Não foi possível concluir.</strong><br>${h(job.mensagemErro || 'Tente reprocessar mais tarde.')}` : `<strong>${job.status === 'PENDENTE' ? 'Seu áudio está na fila.' : 'Estamos transcrevendo seu áudio.'}</strong><br>Você pode fechar esta janela. O status será atualizado automaticamente.`}</div>${job.status === 'ERRO' ? `<div class="dialog-actions"><button class="primary" id="retry-transcription">${icon('refresh')} Reprocessar áudio</button></div><p class="small muted">As partes já salvas serão reutilizadas. Não consome outro arquivo da sua cota diária.</p>` : ''}`}`;
   detail.querySelector('.close-dialog').onclick = () => detail.close();
+  document.querySelector('#retry-transcription')?.addEventListener('click', async event => {
+    const button = event.currentTarget, epoch = state.epoch; button.disabled = true; button.textContent = 'Reenfileirando…';
+    try {
+      const updated = await request('/transcricoes/' + encodeURIComponent(job.id) + '/reprocessar', { method: 'POST', context: 'reprocessar' });
+      if (epoch !== state.epoch) return;
+      if (state.selected?.id === job.id) { state.selected = updated; renderDetail(); }
+      toast('Áudio reenfileirado. As partes já salvas serão reutilizadas.');
+      await refresh();
+    } catch (error) { if (epoch === state.epoch) toast(error.message, true); }
+    finally { if (button.isConnected) { button.disabled = false; button.innerHTML = icon('refresh') + ' Reprocessar áudio'; } }
+  });
   document.querySelector('#copy-text')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(job.texto); toast('Texto copiado.'); } catch { toast('Não foi possível copiar. Você pode selecionar o texto acima.', true); } });
   document.querySelector('#download-text')?.addEventListener('click', () => { const url = URL.createObjectURL(new Blob([job.texto || ''], { type: 'text/plain;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = job.nomeArquivoOriginal.replace(/\.[^.]+$/, '') + '.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
 }

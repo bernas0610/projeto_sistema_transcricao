@@ -21,7 +21,7 @@ do usuário ao fluxo. As propostas não representam funcionalidades entregues.
 | FFmpeg | Timeout de 30 minutos por execução, configurado em `app.ffmpeg.timeout-minutos`. |
 | Cliente Gemini | Timeout de leitura de 20 minutos e conexão de 30 segundos na configuração atual. |
 | Retry | Até cinco tentativas para falhas elegíveis; cota diária explícita encerra o job. |
-| Reinício | Recupera `PENDENTE` e `PROCESSANDO`, reutilizando partes confirmadas no banco; `ERRO` não é retomado automaticamente. |
+| Reinício | Recupera `PENDENTE` e `PROCESSANDO`, reutilizando partes confirmadas no banco; `ERRO` pode ser reenfileirado pelo dono, com o original disponível. |
 | Sessão | Reiniciar o backend exige novo login. |
 
 Timeouts por operação não formam um limite total do job. O tempo final depende
