@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml, validarArquivo, mensagemErro, emAndamento } from '../public/core.js';
+import { escapeHtml, validarArquivo, mensagemErro, emAndamento, orientacaoErro } from '../public/core.js';
 
 test('nomes e texto de transcrição não inserem HTML executável', () => {
   assert.equal(escapeHtml('<img src=x onerror="alert(1)">'), '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
@@ -24,4 +24,10 @@ test('somente jobs pendentes e processando são acompanhados', () => {
   assert.ok(emAndamento({ status: 'PROCESSANDO' }));
   assert.equal(emAndamento({ status: 'CONCLUIDA' }), false);
   assert.equal(emAndamento({ status: 'ERRO' }), false);
+});
+test('cota do serviço e áudio inválido têm orientações diferentes do limite de upload', () => {
+  assert.match(orientacaoErro({ codigoErro: 'COTA_PROVEDOR_DIARIA' }), /renovação/);
+  assert.match(orientacaoErro({ codigoErro: 'LIMITE_PROVEDOR' }), /minutos/);
+  assert.match(orientacaoErro({ codigoErro: 'AUDIO_INVALIDO' }), /versão válida/);
+  assert.match(mensagemErro(429, { code: 'COTA_UPLOAD', message: 'Cota de upload atingida' }), /upload/);
 });

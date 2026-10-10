@@ -1,5 +1,12 @@
 # 00 — Arquitetura
 
+Erros HTTP usam um [contrato público uniforme](02-CONTRATO%20DA%20API.md), inclusive
+sessão e CSRF. Falhas assíncronas persistem código e mensagem segura; o processador
+não expõe detalhes técnicos do Gemini ou do FFmpeg. A V5 sanitiza erros históricos.
+Os [eventos operacionais](05-OBSERVABILIDADE.md) correlacionam fila, partes e retries
+por job. A [avaliação de fidelidade](fidelidade/README.md) usa referências e um
+comparador offline, sem chamadas adicionais ao provedor.
+
 [← README](../README.md) · [Modelo de dados →](01-MODELO%20DE%20DADOS.md)
 
 ## Objetivo e escopo

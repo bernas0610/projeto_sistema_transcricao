@@ -11,6 +11,7 @@ export function validarArquivo(file) {
   return null;
 }
 export function mensagemErro(status, body, context = '') {
+  if (body?.code && ![401, 409].includes(status)) return body.message || 'Não foi possível concluir a operação.';
   if (status === 401) return context === 'login' ? 'E-mail ou senha incorretos.' : 'Sua sessão expirou. Entre novamente.';
   if (status === 403) return 'Acesso negado ou sessão de segurança expirada. Atualize a página e tente novamente.';
   if (status === 409) return context === 'reprocessar'
@@ -21,4 +22,16 @@ export function mensagemErro(status, body, context = '') {
   if (status === 413) return 'O arquivo excede o limite de 300 MB.';
   if (status === 400) return 'Verifique os dados informados e tente novamente.';
   return body?.message || 'Não foi possível concluir a operação. Tente novamente.';
+}
+
+export function orientacaoErro(job) {
+  const orientacoes = {
+    COTA_PROVEDOR_DIARIA: 'Aguarde a renovação da cota do serviço antes de reprocessar.',
+    LIMITE_PROVEDOR: 'Aguarde alguns minutos antes de reprocessar.',
+    PROVEDOR_INDISPONIVEL: 'Tente reprocessar mais tarde.',
+    AUDIO_INVALIDO: 'Confira o áudio e envie uma versão válida.',
+    ORIGINAL_AUSENTE: 'Envie o áudio novamente.',
+  };
+  return orientacoes[job.codigoErro] || (job.erroRepetivel
+    ? 'Tente reprocessar mais tarde.' : 'Avise o administrador antes de reprocessar.');
 }

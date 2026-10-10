@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "samples": [
+    { "id": "01", "file": "01-cotidiano.txt", "category": "fala cotidiana" },
+    { "id": "02", "file": "02-nomes.txt", "category": "nomes e termos próprios" },
+    { "id": "03", "file": "03-numeros.txt", "category": "números e negações" },
+    { "id": "04", "file": "04-tecnico.txt", "category": "vocabulário técnico" },
+    { "id": "05", "file": "05-pausas.txt", "category": "pausas e repetição" }
+  ]
+}

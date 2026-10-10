@@ -1,6 +1,11 @@
 package com.bernardo.transcricao.service;
 
 import com.bernardo.transcricao.model.StatusTranscricao;
+import com.bernardo.transcricao.exception.CodigoErro;
+import com.bernardo.transcricao.exception.TranscriptionException;
+import org.slf4j.MDC;
+import java.time.Instant;
+import java.time.Duration;
 import com.bernardo.transcricao.model.Transcricao;
 import com.bernardo.transcricao.provider.TranscriptionProvider;
 import com.bernardo.transcricao.repository.TranscricaoRepository;
@@ -44,15 +49,23 @@ public class TranscricaoProcessor {
         }
 
         Path pastaPartes = null;
+        long inicio = System.nanoTime();
+        String mdcAnterior = MDC.get("job_id");
+        MDC.put("job_id", id.toString());
+        long filaMs = transcricao.getAtualizadoEm() == null ? 0
+                : Math.max(0, Duration.between(transcricao.getAtualizadoEm(), Instant.now()).toMillis());
+        log.info("evento=job_inicio job_id={} fila_ms={} recuperacao={}", id, filaMs,
+                transcricao.getStatus() == StatusTranscricao.PROCESSANDO);
 
         try {
             Path original = Path.of(transcricao.getCaminhoArquivo());
             pastaPartes = original.resolveSibling("partes-" + id);
             if (!Files.isRegularFile(original)) {
-                throw new IOException("Arquivo de áudio original não encontrado: " + original);
+                throw new TranscriptionException(CodigoErro.ORIGINAL_AUSENTE);
             }
             transcricao.setStatus(StatusTranscricao.PROCESSANDO);
             transcricao.setMensagemErro(null);
+            transcricao.setCodigoErro(null);
             transcricao.setTexto(null);
             if (transcricao.getDuracaoParteSegundos() == null) {
                 transcricao.setDuracaoParteSegundos(audioService.getDuracaoParteSegundos());
@@ -67,20 +80,23 @@ public class TranscricaoProcessor {
             Map<Integer, String> textosSalvos = new HashMap<>();
             for (var salva : checkpoints.listar(id)) {
                 if (salva.getNumero() >= partes.size()) {
-                    throw new IOException("As partes geradas não correspondem ao progresso salvo");
+                    throw new TranscriptionException(CodigoErro.CHECKPOINT_INCOMPATIVEL);
                 }
                 textosSalvos.put(salva.getNumero(), salva.getTexto());
             }
             if (!textosSalvos.isEmpty() && transcricao.getTotalPartes() != partes.size()) {
-                throw new IOException("A divisão do áudio mudou desde o progresso salvo");
+                throw new TranscriptionException(CodigoErro.CHECKPOINT_INCOMPATIVEL);
             }
             transcricao.setTotalPartes(partes.size());
             transcricao.setPartesConcluidas(textosSalvos.size());
             repository.save(transcricao);
 
+            log.info("evento=job_partes job_id={} total={} salvas={}", id, partes.size(), textosSalvos.size());
             StringBuilder texto = new StringBuilder();
             for (int i = 0; i < partes.size(); i++) {
-                log.info("Transcrição {}: parte {}/{}", id, i + 1, partes.size());
+                long inicioParte = System.nanoTime();
+                MDC.put("parte", String.valueOf(i + 1));
+                log.info("evento=parte_inicio job_id={} parte={} total={}", id, i + 1, partes.size());
                 String parte = textosSalvos.get(i);
                 if (parte == null) {
                     parte = provider.transcrever(partes.get(i), MIME_PARTES);
@@ -88,6 +104,9 @@ public class TranscricaoProcessor {
                 } else {
                     log.info("Transcrição {}: parte {}/{} recuperada do banco", id, i + 1, partes.size());
                 }
+                log.info("evento=parte_fim job_id={} parte={} reutilizada={} duracao_ms={}",
+                        id, i + 1, textosSalvos.containsKey(i), (System.nanoTime() - inicioParte) / 1_000_000);
+                MDC.remove("parte");
                 if (!texto.isEmpty()) {
                     texto.append("\n\n");
                 }
@@ -98,32 +117,33 @@ public class TranscricaoProcessor {
             transcricao.setStatus(StatusTranscricao.CONCLUIDA);
             repository.save(transcricao);
             apagarArquivo(original);
-            log.info("Transcrição {}: concluída", id);
+            log.info("evento=job_fim job_id={} status=CONCLUIDA partes={} duracao_ms={}",
+                    id, partes.size(), (System.nanoTime() - inicio) / 1_000_000);
         } catch (Exception e) {
             if (Thread.currentThread().isInterrupted()) {
                 // Mantém o job e o original para recuperação na próxima inicialização.
-                log.info("Transcrição {} interrompida; será recuperada no próximo início", id);
+                log.info("evento=job_interrompido job_id={} duracao_ms={}", id, (System.nanoTime() - inicio) / 1_000_000);
                 return;
             }
-            log.error("Transcrição {} falhou", id, e);
+            CodigoErro codigo = CodigoErro.de(e);
+            log.error("evento=job_fim job_id={} status=ERRO codigo={} tipo={} duracao_ms={}",
+                    id, codigo, e.getClass().getSimpleName(), (System.nanoTime() - inicio) / 1_000_000);
             transcricao.setStatus(StatusTranscricao.ERRO);
-            transcricao.setMensagemErro(mensagemDe(e));
+            transcricao.setCodigoErro(codigo);
+            transcricao.setMensagemErro(codigo.mensagem());
             repository.save(transcricao);
         } finally {
             apagarPasta(pastaPartes);
+            MDC.remove("parte");
+            if (mdcAnterior == null) MDC.remove("job_id"); else MDC.put("job_id", mdcAnterior);
         }
-    }
-
-    private String mensagemDe(Exception e) {
-        String mensagem = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-        return mensagem.length() > 1000 ? mensagem.substring(0, 1000) : mensagem;
     }
 
     private void apagarArquivo(Path arquivo) {
         try {
             Files.deleteIfExists(arquivo);
         } catch (IOException e) {
-            log.warn("Não foi possível apagar {}", arquivo, e);
+            log.warn("evento=limpeza_falha job_id={} tipo={}", MDC.get("job_id"), e.getClass().getSimpleName());
         }
     }
 
@@ -134,7 +154,7 @@ public class TranscricaoProcessor {
         try (Stream<Path> arquivos = Files.walk(pasta)) {
             arquivos.sorted(Comparator.reverseOrder()).forEach(this::apagarArquivo);
         } catch (IOException e) {
-            log.warn("Não foi possível limpar {}", pasta, e);
+            log.warn("evento=limpeza_falha job_id={} tipo={}", MDC.get("job_id"), e.getClass().getSimpleName());
         }
     }
 }

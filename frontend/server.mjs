@@ -19,7 +19,7 @@ export function createFrontendServer({ apiTarget = 'http://localhost:8080', publ
         response.on('error', () => res.destroy());
       });
       upstream.on('error', () => {
-        if (!res.headersSent) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ message: 'Não foi possível conectar ao backend. Verifique se a aplicação está rodando.' })); }
+        if (!res.headersSent) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ status: 503, code: 'SERVICO_INDISPONIVEL', retryable: true, message: 'Não foi possível conectar ao backend. Verifique se a aplicação está rodando.' })); }
         else res.destroy();
       });
       req.on('aborted', () => upstream.destroy());

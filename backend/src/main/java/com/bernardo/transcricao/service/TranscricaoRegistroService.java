@@ -43,6 +43,7 @@ public class TranscricaoRegistroService {
         }
         job.setStatus(StatusTranscricao.PENDENTE);
         job.setMensagemErro(null);
+        job.setCodigoErro(null);
         job.setTexto(null);
         return repository.save(job);
     }

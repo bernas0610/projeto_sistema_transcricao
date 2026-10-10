@@ -180,7 +180,7 @@ Modelo, duração das partes, número de threads e cota diária ficam em [`appli
 Execute a suíte isolada do backend a partir de `backend/`:
 
 ```powershell
-.\mvnw.cmd '-Dtest=AuthIntegrationTest,GeminiRetryTest,TranscricaoRecoveryTest,TranscricaoProcessorTest,AudioServiceTest,TranscricaoCheckpointIntegrationTest' test
+.\mvnw.cmd '-Dtest=*Test,!GeminiTranscriptionProviderTest' test
 ```
 
 Essa seleção usa H2 e substitutos do provedor e do processador nos testes de integração; não envia áudio ao Gemini nem depende de PostgreSQL. Os testes de divisão de áudio usam FFmpeg e são ignorados quando o executável não está disponível.
@@ -193,6 +193,16 @@ npm run build
 ```
 
 Os testes verificam isolamento entre contas, permissões, cota, recuperação de jobs, tratamento de falhas do Gemini, divisão do áudio, validação de arquivos, escape de HTML e preservação de sessão, CSRF e multipart pelo proxy.
+
+O comparador de fidelidade tem testes próprios, executados na raiz:
+
+```powershell
+node --test tools/fidelity/*.test.mjs
+```
+
+As [cinco referências para gravação](docs/fidelidade/README.md) e o comparador
+offline medem omissões, substituições, inserções e WER. A medição com voz real
+aguarda as gravações; testes sintéticos não demonstram qualidade do provedor.
 
 ## Limites e comportamento atual
 
@@ -224,6 +234,8 @@ O projeto está em desenvolvimento e a execução documentada é local. Para pub
 | [02 — Contrato da API](docs/02-CONTRATO%20DA%20API.md) | Endpoints, autenticação, CSRF, formatos de entrada/saída e códigos HTTP. |
 | [03 — SLA e reengajamento](docs/03-SLA%20e%20reengajamento.md) | Comportamento atual, retorno ao fluxo e indicadores propostos, sem prometer um SLA existente. |
 | [04 — Backlog](docs/04-BACKLOG.md) | Entregas, validações pendentes, prioridades sugeridas e decisões em aberto. |
+| [05 — Observabilidade](docs/05-OBSERVABILIDADE.md) | Eventos de fila, partes, retries e duração; consulta segura dos logs. |
+| [Fidelidade](docs/fidelidade/README.md) | Referências para gravação, avaliação offline e limites da métrica. |
 
 ---
 

@@ -127,7 +127,7 @@ class TranscricaoCheckpointIntegrationTest {
         processador().processar(job.getId());
         var falhou = jobs.findById(job.getId()).orElseThrow();
         assertEquals(StatusTranscricao.ERRO, falhou.getStatus());
-        assertTrue(falhou.getMensagemErro().contains("divisão do áudio mudou"));
+        assertEquals(com.bernardo.transcricao.exception.CodigoErro.CHECKPOINT_INCOMPATIVEL, falhou.getCodigoErro());
         assertEquals(1, falhou.getPartesConcluidas());
         assertEquals(1, partes.countByTranscricaoId(job.getId()));
         assertTrue(Files.exists(Path.of(job.getCaminhoArquivo())));

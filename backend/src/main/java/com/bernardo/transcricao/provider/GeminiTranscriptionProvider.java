@@ -1,6 +1,7 @@
 package com.bernardo.transcricao.provider;
 
 import com.bernardo.transcricao.exception.TranscriptionException;
+import com.bernardo.transcricao.exception.CodigoErro;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -69,7 +70,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
     @Override
     public String transcrever(Path audio, String mimeType) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new TranscriptionException("GEMINI_API_KEY não configurada");
+            throw new TranscriptionException(CodigoErro.CONFIGURACAO_PROVEDOR);
         }
 
         FileInfo arquivo = comRetry("upload do áudio", () -> enviar(audio, mimeType));
@@ -88,7 +89,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
         try {
             tamanho = Files.size(audio);
         } catch (IOException e) {
-            throw new TranscriptionException("Não foi possível ler o áudio: " + audio, e);
+            throw new TranscriptionException(CodigoErro.PROCESSAMENTO_AUDIO, e);
         }
 
         // 1) abre a sessão de upload resumable
@@ -106,7 +107,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
 
         String urlUpload = inicio.getHeaders().getFirst("X-Goog-Upload-URL");
         if (urlUpload == null) {
-            throw new TranscriptionException("O Gemini não devolveu a URL de upload");
+            throw new TranscriptionException(CodigoErro.RESPOSTA_PROVEDOR);
         }
 
         // 2) envia os bytes e finaliza
@@ -120,7 +121,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
                 .body(UploadResponse.class);
 
         if (resposta == null || resposta.file() == null || resposta.file().uri() == null) {
-            throw new TranscriptionException("Resposta de upload inválida do Gemini");
+            throw new TranscriptionException(CodigoErro.RESPOSTA_PROVEDOR);
         }
         return resposta.file();
     }
@@ -136,7 +137,10 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
                     .body(FileInfo.class));
         }
         if (atual == null || "FAILED".equalsIgnoreCase(atual.state())) {
-            throw new TranscriptionException("O Gemini não conseguiu processar o arquivo enviado");
+            throw new TranscriptionException(CodigoErro.RESPOSTA_PROVEDOR);
+        }
+        if ("PROCESSING".equalsIgnoreCase(atual.state())) {
+            throw new TranscriptionException(CodigoErro.PROVEDOR_INDISPONIVEL);
         }
     }
 
@@ -206,7 +210,7 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
             }
         }
         if (texto.isEmpty()) {
-            throw new TranscriptionException("O Gemini não retornou texto na resposta");
+            throw new TranscriptionException(CodigoErro.RESPOSTA_PROVEDOR);
         }
         return texto.toString().strip();
     }
@@ -231,29 +235,36 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
         for (int tentativa = 1; ; tentativa++) {
             Duration espera;
             try {
-                return acao.get();
+                long inicio = System.nanoTime();
+                log.info("evento=provedor_tentativa operacao={} tentativa={}", operacao, tentativa);
+                T resultado = acao.get();
+                log.info("evento=provedor_sucesso operacao={} tentativa={} duracao_ms={}",
+                        operacao, tentativa, (System.nanoTime() - inicio) / 1_000_000);
+                return resultado;
             } catch (RestClientResponseException e) {
                 int status = e.getStatusCode().value();
                 if (status == 429 && GeminiQuotaError.cotaDiaria(e.getResponseBodyAsString())) {
-                    log.warn("Gemini: cota diária esgotada em {}; operação encerrada sem retry", operacao);
-                    throw new TranscriptionException(
-                            "Cota diária do Gemini esgotada para este projeto/modelo (HTTP 429). "
-                                    + "Tente novamente após a renovação da cota ou confira os limites no AI Studio.", e);
+                    log.warn("evento=provedor_falha operacao={} tentativa={} status=429 codigo=COTA_PROVEDOR_DIARIA", operacao, tentativa);
+                    throw new TranscriptionException(CodigoErro.COTA_PROVEDOR_DIARIA, e);
                 }
                 boolean transitorio = status == 429 || status >= 500;
                 if (!transitorio || tentativa >= MAX_TENTATIVAS) {
-                    throw new TranscriptionException("Falha em " + operacao + " (HTTP " + status + "): "
-                            + resumo(e.getResponseBodyAsString()), e);
+                    CodigoErro codigo = status == 429 ? CodigoErro.LIMITE_PROVEDOR
+                            : status >= 500 ? CodigoErro.PROVEDOR_INDISPONIVEL
+                            : status == 401 || status == 403 || status == 404 ? CodigoErro.CONFIGURACAO_PROVEDOR
+                            : CodigoErro.REQUISICAO_PROVEDOR;
+                    log.warn("evento=provedor_falha operacao={} tentativa={} status={} codigo={}", operacao, tentativa, status, codigo);
+                    throw new TranscriptionException(codigo, e);
                 }
                 espera = esperaApos(e, tentativa);
             } catch (ResourceAccessException e) {
                 if (tentativa >= MAX_TENTATIVAS) {
-                    throw new TranscriptionException(
-                            "Falha em " + operacao + " (rede/timeout): " + e.getMessage(), e);
+                    log.warn("evento=provedor_falha operacao={} tentativa={} codigo=PROVEDOR_INDISPONIVEL", operacao, tentativa);
+                    throw new TranscriptionException(CodigoErro.PROVEDOR_INDISPONIVEL, e);
                 }
                 espera = Duration.ofSeconds(10L * tentativa);
             }
-            log.warn("Gemini: {} falhou (tentativa {}/{}); nova tentativa em {}s",
+            log.warn("evento=provedor_retry operacao={} tentativa={} max_tentativas={} espera_s={}",
                     operacao, tentativa, MAX_TENTATIVAS, espera.toSeconds());
             dormir(espera);
         }
@@ -279,14 +290,6 @@ public class GeminiTranscriptionProvider implements TranscriptionProvider {
             Thread.currentThread().interrupt();
             throw new TranscriptionException("Transcrição interrompida", e);
         }
-    }
-
-    private String resumo(String texto) {
-        if (texto == null) {
-            return "";
-        }
-        String limpo = texto.strip();
-        return limpo.length() > 500 ? limpo.substring(0, 500) : limpo;
     }
 
     // ---------- DTOs (só os campos que usamos) ----------

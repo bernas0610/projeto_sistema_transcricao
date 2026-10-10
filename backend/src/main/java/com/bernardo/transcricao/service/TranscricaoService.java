@@ -15,6 +15,7 @@ import com.bernardo.transcricao.dto.TranscricoesPage;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
+@lombok.extern.slf4j.Slf4j
 @Service
 @RequiredArgsConstructor
 public class TranscricaoService {
@@ -33,6 +34,7 @@ public class TranscricaoService {
             armazenamento.remover(caminho);
             throw e;
         }
+        log.info("evento=job_enfileirado job_id={} origem=upload", salva.getId());
         processor.processar(salva.getId()); // roda em segundo plano
         return salva;
     }
@@ -45,6 +47,7 @@ public class TranscricaoService {
     public Transcricao reprocessar(UUID id, UUID usuarioId) {
         Transcricao job = registro.prepararReprocessamento(id, usuarioId);
         // Dispatch only after the reservation transaction has committed.
+        log.info("evento=job_enfileirado job_id={} origem=reprocessamento partes_salvas={}", job.getId(), job.getPartesConcluidas());
         processor.processar(job.getId());
         return job;
     }

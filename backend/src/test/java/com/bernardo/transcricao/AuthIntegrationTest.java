@@ -88,6 +88,26 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void contratoDeErrosIncluiSegurancaValidacaoCotaEConflito() throws Exception {
+        mvc.perform(get("/transcricoes")).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("status").value(401)).andExpect(jsonPath("code").value("NAO_AUTENTICADO"))
+                .andExpect(jsonPath("message").isString()).andExpect(jsonPath("retryable").value(false));
+        mvc.perform(post("/auth/login")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("code").value("ACESSO_NEGADO"));
+        var session = loginAdmin();
+        mvc.perform(get("/transcricoes/not-a-uuid").session(session)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("code").value("DADOS_INVALIDOS"))
+                .andExpect(jsonPath("trace").doesNotExist());
+        mvc.perform(get("/transcricoes/" + java.util.UUID.randomUUID()).session(session))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("code").value("NAO_ENCONTRADO"));
+        mvc.perform(post("/auth/cadastro").session(session).with(csrf()).contentType("application/json").content("{broken"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("DADOS_INVALIDOS"));
+        mvc.perform(post("/auth/cadastro").session(session).with(csrf()).contentType("application/json")
+                .content("{\"email\":\"bad\",\"senha\":\"x\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("DADOS_INVALIDOS"));
+    }
+
+    @Test
     void cadastroDuplicadoRetorna409() throws Exception {
         cadastrar("teste@example.com");
         mvc.perform(post("/auth/cadastro").session(loginAdmin()).with(csrf()).contentType("application/json")

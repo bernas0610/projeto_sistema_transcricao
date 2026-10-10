@@ -11,8 +11,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.http.HttpStatus;
 
 import java.util.Locale;
 import jakarta.servlet.DispatcherType;
@@ -39,12 +37,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/cadastro").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                        .authenticationEntryPoint((request, response, error) ->
+                                com.bernardo.transcricao.dto.ErroResponse.escrever(response, 401))
+                        .accessDeniedHandler((request, response, error) ->
+                                com.bernardo.transcricao.dto.ErroResponse.escrever(response, 403)))
                 .requestCache(cache -> cache.disable())
                 .formLogin(login -> login.loginProcessingUrl("/auth/login")
                         .usernameParameter("email")
                         .successHandler((request, response, auth) -> response.setStatus(204))
-                        .failureHandler((request, response, error) -> response.setStatus(401)))
+                        .failureHandler((request, response, error) ->
+                                com.bernardo.transcricao.dto.ErroResponse.escrever(response, 401)))
                 .logout(logout -> logout.logoutUrl("/auth/logout")
                         .logoutSuccessHandler((request, response, auth) -> response.setStatus(204)))
                 .build();

@@ -40,6 +40,10 @@ public class Transcricao {
     @Column(name = "mensagem_erro", columnDefinition = "TEXT")
     private String mensagemErro;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "codigo_erro", length = 50)
+    private com.bernardo.transcricao.exception.CodigoErro codigoErro;
+
     @Column(name = "total_partes", nullable = false)
     private int totalPartes;
 

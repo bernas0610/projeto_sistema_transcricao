@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -67,7 +66,7 @@ public class AudioService {
                     .sorted()
                     .toList();
             if (partes.isEmpty()) {
-                throw new AudioProcessingException("O arquivo não contém áudio utilizável");
+                throw new AudioProcessingException(com.bernardo.transcricao.exception.CodigoErro.AUDIO_INVALIDO);
             }
             return partes;
         } catch (IOException e) {
@@ -90,7 +89,7 @@ public class AudioService {
                 throw new AudioProcessingException("Tempo limite excedido ao processar o áudio");
             }
             if (processo.exitValue() != 0) {
-                throw new AudioProcessingException("ffmpeg falhou: " + fimDoLog(log));
+                throw new AudioProcessingException(com.bernardo.transcricao.exception.CodigoErro.AUDIO_INVALIDO);
             }
         } catch (IOException e) {
             throw new AudioProcessingException(
@@ -113,12 +112,4 @@ public class AudioService {
         }
     }
 
-    private String fimDoLog(Path log) {
-        try {
-            String texto = new String(Files.readAllBytes(log), StandardCharsets.UTF_8).strip();
-            return texto.length() > 500 ? texto.substring(texto.length() - 500) : texto;
-        } catch (IOException e) {
-            return "(log indisponível)";
-        }
-    }
 }

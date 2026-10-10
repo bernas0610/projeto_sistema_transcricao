@@ -62,7 +62,8 @@ class TranscricaoProcessorTest {
         Transcricao job = job(StatusTranscricao.PENDENTE);
         processor.processar(job.getId());
         assertEquals(StatusTranscricao.ERRO, job.getStatus());
-        assertTrue(job.getMensagemErro().contains("original não encontrado"));
+        assertEquals(com.bernardo.transcricao.exception.CodigoErro.ORIGINAL_AUSENTE, job.getCodigoErro());
+        assertFalse(job.getMensagemErro().contains(tmp.toString()));
         verifyNoInteractions(audioService, provider);
     }
 
@@ -88,7 +89,7 @@ class TranscricaoProcessorTest {
         processor.processar(job.getId());
 
         assertEquals(StatusTranscricao.ERRO, job.getStatus());
-        assertEquals("Falha no Gemini", job.getMensagemErro());
+        assertEquals(com.bernardo.transcricao.exception.CodigoErro.RESPOSTA_PROVEDOR.mensagem(), job.getMensagemErro());
         assertTrue(Files.exists(original));
     }
 

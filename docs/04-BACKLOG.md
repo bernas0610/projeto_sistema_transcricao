@@ -20,6 +20,12 @@ para o projeto, sem datas de entrega.
   progresso no histórico/detalhe; retomada reutiliza trechos confirmados.
 - [x] P03: reprocessamento autenticado pelo dono, com original disponível,
   checkpoints preservados e bloqueio de pedidos concorrentes, sem novo upload.
+- [x] P04: envelope HTTP uniforme, inclusive segurança; códigos de falha do job,
+  mensagens públicas e orientações específicas; sanitização de erros históricos na V5.
+- [x] P05: eventos de fila, partes, retries, duração e causa com correlação por job,
+  sem publicar resposta bruta do provedor, conteúdo de áudio ou credenciais.
+- [x] P01 — preparação: cinco referências para gravação e comparador offline de
+  WER, omissões, substituições e inserções. Medição com voz real continua pendente.
 - [x] Tratamento específico de cota diária explícita do Gemini.
 - [x] Autenticação por sessão, BCrypt e CSRF.
 - [x] Limite diário de cinco arquivos por usuário, com reserva transacional.
@@ -109,14 +115,28 @@ navegador com respostas simuladas; nenhuma chamada real ao Gemini foi feita.
 
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |
-| P01 | Medir fidelidade da transcrição | Comparar áudio/texto de referência, registrar omissões e escolher ajustes com evidência. |
+| P01 — preparado; medir | Medir fidelidade da transcrição | Usuário grava cinco referências; comparar `.txt` sem correção, produzir baseline e escolher ajustes com evidência. |
 | P02 — entregue | Progresso e checkpoint por parte | Partes confirmadas são reutilizadas; testes com H2 cobrem interrupção, retomada, falha e divisão incompatível. |
 | P03 — entregue | Reprocessamento de jobs com erro | Dono reenfileira o mesmo job com original disponível; bloqueio transacional impede pedidos simultâneos e não reserva nova cota de upload. |
-| P04 | Contrato de erros uniforme | Respostas previsíveis para validação, segurança e falhas; frontend trata cada causa. |
-| P05 | Observabilidade do processamento | Registrar início, fim, fila, tentativas e causa de erro sem expor credenciais ou áudio. |
+| P04 — entregue | Contrato de erros uniforme | Envelope com status/code/message/retryable; jobs têm código e orientação por causa; segurança também retorna JSON. |
+| P05 — entregue | Observabilidade do processamento | Eventos de início, fim, fila, partes, tentativas e causas; correlação MDC e testes contra vazamento. |
 | P06 | Backups e retenção | Definir retenção de originais com erro e procedimento de backup/restauração de banco e arquivos. |
 
 ## Prioridade 2 — experiência e manutenção
+
+### Entrega de 10/10/2026 — P04, P05 e preparação de P01
+
+A suíte isolada passou com 65 testes de backend, oito de frontend e sete do
+comparador/CLI de fidelidade, além do build. Nenhuma chamada real ao Gemini foi
+feita nesta entrega. Os testes de FFmpeg executaram; o teste real do provedor e
+o contexto dependente de PostgreSQL não integram essa seleção isolada.
+O comparador não produz sucesso quando faltam transcrições e registra explicitamente
+uma avaliação incompleta. O usuário informou que ainda não possui áudios/textos
+de referência e pediu preparação das frases para gravar. Não há WER de voz real,
+medição representativa de qualidade nem ajuste de prompt nesta etapa.
+
+Instruções: [fidelidade](fidelidade/README.md), [observabilidade](05-OBSERVABILIDADE.md)
+e [contrato de erros](02-CONTRATO%20DA%20API.md).
 
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |

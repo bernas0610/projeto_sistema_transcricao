@@ -48,7 +48,7 @@ class GeminiRetryTest {
 
         assertEquals(1, chamadas.get());
         assertTrue(esperas.isEmpty());
-        assertTrue(erro.getMessage().contains("Cota diária"));
+        assertEquals(com.bernardo.transcricao.exception.CodigoErro.COTA_PROVEDOR_DIARIA, erro.getCodigo());
         assertInstanceOf(RestClientResponseException.class, erro.getCause());
     }
 
@@ -140,6 +140,19 @@ class GeminiRetryTest {
     private static RestClientResponseException http(int status, String corpo) {
         return new RestClientResponseException("Erro", status, "Erro", null,
                 corpo.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 401, 403, 404, 429, 503})
+    void erroFinalClassificadoSemExporRespostaBruta(int status) {
+        TranscriptionException erro = assertThrows(TranscriptionException.class,
+                () -> provider.comRetry("transcrição", () -> { throw http(status, "SEGREDO audio privado api-key"); }));
+        var esperado = status == 429 ? com.bernardo.transcricao.exception.CodigoErro.LIMITE_PROVEDOR
+                : status == 503 ? com.bernardo.transcricao.exception.CodigoErro.PROVEDOR_INDISPONIVEL
+                : status == 400 ? com.bernardo.transcricao.exception.CodigoErro.REQUISICAO_PROVEDOR
+                : com.bernardo.transcricao.exception.CodigoErro.CONFIGURACAO_PROVEDOR;
+        assertEquals(esperado, erro.getCodigo());
+        assertFalse(erro.getMessage().contains("SEGREDO"));
     }
 
 }

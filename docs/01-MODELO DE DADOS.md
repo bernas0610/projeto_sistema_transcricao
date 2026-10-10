@@ -76,7 +76,8 @@ que o processamento falhe depois; recuperar o mesmo job não altera esse contado
 | `caminho_arquivo` | `VARCHAR(500)` | Não | Caminho absoluto do original no disco local. |
 | `status` | `VARCHAR(20)` | Não | Enum persistido como texto; novo job começa em `PENDENTE`. |
 | `texto` | `TEXT` | Sim | Texto consolidado após conclusão. |
-| `mensagem_erro` | `TEXT` | Sim | Motivo da falha; o processador limita a mensagem a 1.000 caracteres. |
+| `mensagem_erro` | `TEXT` | Sim | Mensagem pública definida pelo código, sem resposta bruta do provedor. |
+| `codigo_erro` | `VARCHAR(50)` | Sim | Classificação estável da falha; limpo ao iniciar/reprocessar. |
 | `total_partes` | `INTEGER` | Não | Padrão `0`; total definido após a divisão do áudio. |
 | `partes_concluidas` | `INTEGER` | Não | Padrão `0`; quantidade de checkpoints confirmados. |
 | `duracao_parte_segundos` | `INTEGER` | Sim | Duração fixada no início do processamento e reutilizada nas retomadas. |
@@ -124,6 +125,7 @@ Jobs antigos recuperáveis começam a registrar checkpoints na próxima execuç�
 | V2 | `V2__usuarios_e_donos.sql` | Cria usuários, cota diária, FK de dono e índice. |
 | V3 | `V3__roles_usuario.sql` | Adiciona perfil `USER` por padrão e CHECK de perfis. |
 | V4 | `V4__checkpoints_transcricao.sql` | Cria checkpoints e adiciona contadores e duração da divisão ao job. |
+| V5 | `V5__codigo_erro.sql` | Adiciona classificação de erro e sanitiza mensagens antigas de jobs em `ERRO`. |
 
 O Flyway aplica as migrations e mantém sua tabela de histórico. O Hibernate usa
 `ddl-auto=validate`. Evoluções de schema devem usar novas migrations.

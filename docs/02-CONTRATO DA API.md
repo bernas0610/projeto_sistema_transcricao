@@ -93,6 +93,8 @@ Resposta `202 Accepted`, com header `Location: /transcricoes/{id}`:
   "status": "PENDENTE",
   "texto": null,
   "mensagemErro": null,
+  "codigoErro": null,
+  "erroRepetivel": false,
   "totalPartes": 0,
   "partesConcluidas": 0,
   "criadoEm": "2026-10-09T16:00:00Z",
@@ -161,10 +163,41 @@ estiver pendente, processando ou concluído. Original indisponível também reto
 | `500` | Falha interna, como erro ao persistir ou salvar arquivo. |
 | `503` | Proxy frontend não consegue conectar ao backend. |
 
-Não há envelope de erros padronizado próprio. Algumas respostas do Spring Security
-não incluem JSON; clientes devem tratar status e aceitar corpo ausente. O proxy
-retorna JSON com `message` em sua falha de conexão. A transcrição que falha no
-Gemini permanece consultável por HTTP `200`, com `status: "ERRO"` e a mensagem do job.
+Falhas da API e dos filtros de segurança retornam o envelope abaixo. O proxy
+também usa esse contrato quando o backend está indisponível. Respostas produzidas
+por infraestrutura externa ainda podem não incluir JSON; clientes mantêm fallback
+por status. Motivos técnicos, stack traces, respostas brutas do Gemini e caminhos
+locais não são publicados.
+
+```json
+{"status":429,"code":"COTA_UPLOAD","message":"Você atingiu o limite de arquivos de hoje. Tente novamente amanhã.","retryable":true}
+```
+
+`code` é estável para tratamento pelo cliente; `message` é orientação pública.
+`retryable` indica que a condição pode desaparecer com o tempo, não autoriza loop
+imediato de retry. Códigos HTTP: `DADOS_INVALIDOS`, `NAO_AUTENTICADO`,
+`ACESSO_NEGADO`, `NAO_ENCONTRADO`, `METODO_INVALIDO`, `CONFLITO`,
+`ARQUIVO_GRANDE`, `FORMATO_INVALIDO`, `COTA_UPLOAD`, `ERRO_INTERNO` e
+`SERVICO_INDISPONIVEL` para 400, 401, 403, 404, 405, 409, 413, 415, 429, 500 e 503.
+
+Uma falha assíncrona permanece consultável por HTTP `200`, com `status: "ERRO"`,
+`mensagemErro`, `codigoErro` e `erroRepetivel`. Este último é uma orientação sobre
+a causa; a aceitação do endpoint de reprocessamento continua dependendo de dono,
+estado e original disponível.
+
+| `codigoErro` | Orientação |
+| --- | --- |
+| `COTA_PROVEDOR_DIARIA` | Aguardar renovação da cota do serviço. |
+| `LIMITE_PROVEDOR` | Aguardar alguns minutos. |
+| `PROVEDOR_INDISPONIVEL` | Reprocessar mais tarde após indisponibilidade/rede/timeout. |
+| `RESPOSTA_PROVEDOR` | Provedor não retornou conteúdo utilizável; tentar mais tarde. |
+| `CONFIGURACAO_PROVEDOR`, `REQUISICAO_PROVEDOR` | Administrador precisa conferir configuração/pedido. |
+| `AUDIO_INVALIDO` | Conferir e enviar áudio válido. |
+| `ORIGINAL_AUSENTE` | Novo envio necessário. |
+| `PROCESSAMENTO_AUDIO`, `CHECKPOINT_INCOMPATIVEL`, `ERRO_INTERNO` | Administrador precisa investigar antes de reprocessar. |
+
+O código e a mensagem são limpos ao reenfileirar. A migration V5 sanitiza
+mensagens de jobs antigos com erro, classificando-os como `ERRO_INTERNO`.
 
 Fontes: [controllers](../backend/src/main/java/com/bernardo/transcricao/controller/),
 [DTOs](../backend/src/main/java/com/bernardo/transcricao/dto/) e
