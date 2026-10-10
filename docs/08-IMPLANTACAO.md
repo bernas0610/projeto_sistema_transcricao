@@ -141,3 +141,31 @@ Não expor logs, `.env`, backups ou uploads pela web.
 
 P12 só estará concluída quando houver URL real, certificado válido, smoke passando
 e fluxo de áudio verificado no servidor. Conta/VM/DNS estão pendentes do usuário.
+
+## Acesso temporário pela internet (Cloudflare Quick Tunnel)
+
+Enquanto a Oracle não tiver capacidade para o A1, o sistema local pode ser
+acessado em outro computador pelo navegador, sem instalar Java ou Node nele.
+O computador servidor precisa permanecer ligado, com backend, frontend e túnel
+ativos. Esse acesso temporário não conclui a implantação P12 na Oracle.
+
+Baixar o `cloudflared` somente pela [documentação oficial](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/).
+Com o frontend respondendo em `http://127.0.0.1:5173`, executar no PowerShell:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:5173 --no-autoupdate
+```
+
+Se o executável estiver numa pasta local, usar seu caminho no lugar de
+`cloudflared`. Manter o processo aberto; `Ctrl+C` encerra o acesso. O terminal
+mostra um endereço HTTPS aleatório em `*.trycloudflare.com`, que muda ao reiniciar.
+O endereço é público e o tráfego passa pela Cloudflare: ativar somente com
+autorização do responsável pelos dados e manter o login da aplicação obrigatório.
+Não versionar credenciais, áudios, transcrições ou o executável baixado.
+
+Verificar o link usando outro computador ou celular com dados móveis: a página
+deve abrir e `/transcricoes` deve responder HTTP 401 sem autenticação. HTTP 200
+na página inicial confirma acesso à interface, mas não valida envio de áudio ou
+login completo. Erro 1033 indica túnel desconectado; erro 502 costuma indicar
+falha de comunicação com o serviço local. Quick Tunnels são temporários, sem
+garantia de disponibilidade; consultar seus limites antes de enviar aulas grandes.
