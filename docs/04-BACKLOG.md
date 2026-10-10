@@ -29,7 +29,7 @@ para o projeto, sem datas de entrega.
 - [x] Identidade Transcreve: nome, símbolo de áudio, paleta azul/grafite/cinza,
   textos objetivos e banner do README atualizados em 10/10/2026.
 
-## Próxima etapa — validar o frontend integrado
+## Validação do frontend integrado
 
 O login, logout, navegação, formulário do admin e layout em desktop/celular foram
 conferidos no navegador. O upload foi validado ponta a ponta com áudio sintético
@@ -52,26 +52,42 @@ Usar conta e áudios de teste; chamadas reais ao Gemini consomem a cota do prove
   progresso até 100%, processamento com FFmpeg e Gemini, atualização do histórico
   e abertura do texto concluído. A cota passou de cinco para quatro arquivos.
   Duas tentativas de transcrição falharam antes da conclusão automática.
-- **V03 parcialmente validado:** exportação pela home gerou `teste-interface.txt`
-  com conteúdo completo e acentuação correta. A cópia mostrou confirmação de
-  sucesso, mas a colagem automatizada não coincidiu com o texto; verificar
-  manualmente e distinguir falha da aplicação de limitação da automação.
+- **V03 validado:** exportação pela home gerou `teste-interface.txt` com conteúdo
+  completo e acentuação correta. O usuário confirmou manualmente a cópia e a
+  colagem do texto “Testando áudio em Flow 1 2 3.” no navegador externo, incluindo
+  o acento de “áudio”. A divergência anterior na colagem automatizada não se
+  reproduziu nesse teste manual.
 - **V02 validado pelo usuário no navegador externo:** gravação com microfone,
   parada, reprodução da prévia, envio e recebimento da transcrição funcionaram.
   A primeira gravação silenciosa ocorreu com o microfone mutado, conforme
-  identificado pelo usuário. A liberação do microfone após parar ainda não foi
-  conferida diretamente.
+  identificado pelo usuário. Ele também confirmou que o indicador de uso do
+  microfone desliga tanto ao parar quanto ao sair da tela durante a gravação.
 - **Fidelidade observada:** na gravação com voz natural, o usuário relatou que
   o provedor transcreveu “flow” em vez de “Flor”, no nome anterior do produto.
   Registrar como exemplo para
   P01; esse teste isolado não mede a qualidade geral da transcrição.
-- **V05 parcialmente validado:** arquivos `.txt` e WAV vazio foram rejeitados na
-  interface, mantendo o botão de envio desabilitado e a cota em quatro.
+- **V05 validado nos cenários previstos:** arquivos `.txt` e WAV vazio foram
+  rejeitados na interface, sem consumo de cota. Em uma instância temporária da
+  interface real com respostas controladas, HTTP 401 após autenticação retornou
+  ao login com “Sua sessão expirou. Entre novamente.”; proxy sem backend exibiu
+  mensagem de conexão indisponível; cota zerada desabilitou o envio mesmo com
+  áudio selecionado; HTTP 429 no upload exibiu a mensagem de limite diário e
+  liberou o formulário após a falha. Os testes de integração com H2 confirmam
+  rejeição do sexto arquivo no backend real. As simulações não interromperam o
+  backend de uso nem consumiram cota do Gemini.
+- **V04 validado:** administrador criou uma conta comum pela interface e o login
+  funcionou. A conta não mostrou o menu de administração, recebeu cota própria
+  de cinco arquivos e exibiu histórico vazio, sem os jobs do administrador.
+  A abertura direta de um job do administrador retornou HTTP 404, sem conteúdo.
+  Os 22 testes de `AuthIntegrationTest` foram reexecutados e passaram, incluindo
+  bloqueio de cadastro por usuário comum com HTTP 403 e isolamento por dono.
+  A conta de QA foi mantida no banco local, sem uploads; o navegador do aplicativo
+  ficou autenticado nela ao fim da validação.
 - **Verificações automatizadas:** 47 testes isolados do backend e sete testes do
   frontend passaram; build do frontend concluído.
-- **Pendentes:** liberação do microfone em V02, V04, demais cenários de V05 e
-  confirmação da cópia em V03.
-  O áudio sintético valida o fluxo; não mede fidelidade de fala natural.
+- **V01–V05 concluídos no escopo descrito acima.** O áudio sintético valida o
+  fluxo; não mede fidelidade de fala natural. As confirmações manuais se referem
+  ao navegador externo do usuário; ampliar compatibilidade faz parte de P07.
 
 ## Prioridade 1 — confiabilidade e qualidade
 
