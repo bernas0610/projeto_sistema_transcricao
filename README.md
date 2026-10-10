@@ -237,8 +237,20 @@ O projeto está em desenvolvimento e a execução documentada é local. Para pub
 | [05 — Observabilidade](docs/05-OBSERVABILIDADE.md) | Eventos de fila, partes, retries e duração; consulta segura dos logs. |
 | [Fidelidade](docs/fidelidade/README.md) | Referências para gravação, avaliação offline e limites da métrica. |
 | [06 — Backup e retenção](docs/06-BACKUP-E-RETENCAO.md) | Backup offline, restauração isolada e limpeza manual com verificação. |
+| [08 — Implantação](docs/08-IMPLANTACAO.md) | Docker, Oracle Always Free, HTTPS, dados persistentes e validação da publicação. |
 | [07 — Acessibilidade e CI](docs/07-ACESSIBILIDADE-E-CI.md) | Navegação por teclado, compatibilidade verificada e testes no GitHub. |
 
 ---
 
 Desenvolvido por **[Bernardo Mendes](https://github.com/bernas0610)**.
+
+## Publicação e histórico
+
+O histórico retorna metadados sem textos completos. O detalhe e a última
+transcrição da home preservam leitura, cópia e exportação integral.
+
+O pacote de publicação está em `deploy/compose.yml`: Caddy HTTPS, PostgreSQL,
+backend com FFmpeg e volumes persistentes. A implantação escolhida é uma VM
+Oracle Always Free com hostname gratuito DuckDNS. Conta, VM e DNS ainda precisam
+ser criados; não existe URL pública nesta etapa. Siga o
+[roteiro de implantação](docs/08-IMPLANTACAO.md).

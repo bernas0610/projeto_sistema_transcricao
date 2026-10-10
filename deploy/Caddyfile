@@ -1,0 +1,18 @@
+{$SITE_ADDRESS} {
+    request_body {
+        max_size 301MB
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+    }
+    @api path /auth /auth/* /transcricoes /transcricoes/*
+    handle @api {
+        reverse_proxy backend:8080
+    }
+    handle {
+        root * /srv
+        header Cache-Control no-store
+        file_server
+    }
+}

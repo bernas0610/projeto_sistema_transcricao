@@ -227,6 +227,32 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void historicoRetornaMetadadosEDetalhePreservaTextoLongoPrivado() throws Exception {
+        Usuario dono = cadastrar("historico@example.com");
+        cadastrar("vizinho@example.com");
+        Transcricao job = registro.registrar("aula.mp3", Path.of("target/aula.mp3"), dono.getId());
+        String texto = "Conteúdo integral da aula. ".repeat(10000);
+        job.setTexto(texto);
+        job.setStatus(com.bernardo.transcricao.model.StatusTranscricao.CONCLUIDA);
+        job.setTotalPartes(2); job.setPartesConcluidas(2);
+        transcricoes.saveAndFlush(job);
+        var session = login("historico@example.com");
+        var response = mvc.perform(get("/transcricoes?pagina=0").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
+                .andExpect(jsonPath("itens[0].id").value(job.getId().toString()))
+                .andExpect(jsonPath("itens[0].partesConcluidas").value(2))
+                .andExpect(jsonPath("itens[0].texto").doesNotExist())
+                .andExpect(jsonPath("itens[0].caminhoArquivo").doesNotExist()).andReturn();
+        assertTrue(response.getResponse().getContentAsByteArray().length < 2000);
+        mvc.perform(get("/transcricoes/" + job.getId()).session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("texto").value(texto));
+        var other = login("vizinho@example.com");
+        mvc.perform(get("/transcricoes").session(other)).andExpect(jsonPath("total").value(0));
+        mvc.perform(get("/transcricoes/" + job.getId()).session(other)).andExpect(status().isNotFound());
+        mvc.perform(get("/transcricoes?pagina=-1").session(session)).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void sextoArquivoBloqueadoEDiaNovoRenovaCota() {
         Usuario usuario = cadastrar("teste@example.com");
         for (int i = 0; i < 5; i++) {

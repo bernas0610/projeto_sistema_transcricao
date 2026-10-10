@@ -16,7 +16,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface TranscricaoRepository extends JpaRepository<Transcricao, UUID> {
-    Page<Transcricao> findAllByUsuarioId(UUID usuarioId, Pageable pageable);
+    @Query("select new com.bernardo.transcricao.dto.TranscricaoResumo(t.id, t.nomeArquivoOriginal, "
+            + "t.status, t.mensagemErro, t.codigoErro, t.totalPartes, t.partesConcluidas, "
+            + "t.criadoEm, t.atualizadoEm) from Transcricao t where t.usuarioId = :usuarioId")
+    Page<com.bernardo.transcricao.dto.TranscricaoResumo> listarResumos(
+            @Param("usuarioId") UUID usuarioId, Pageable pageable);
     Optional<Transcricao> findByIdAndUsuarioId(UUID id, UUID usuarioId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Transcricao t where t.id = :id and t.usuarioId = :usuarioId")

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 export function createFrontendServer({ apiTarget = 'http://localhost:8080', publicDir = new URL('./public/', import.meta.url) } = {}) {
   const target = new URL(apiTarget);
   if (!['http:', 'https:'].includes(target.protocol)) throw new Error('API_TARGET deve ser HTTP ou HTTPS');
-  const assets = { '/': ['index.html', 'text/html'], '/index.html': ['index.html', 'text/html'], '/styles.css': ['styles.css', 'text/css'], '/theme.css': ['theme.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'], '/core.js': ['core.js', 'text/javascript'] };
+  const assets = { '/': ['index.html', 'text/html'], '/index.html': ['index.html', 'text/html'], '/styles.css': ['styles.css', 'text/css'], '/theme.css': ['theme.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'], '/core.js': ['core.js', 'text/javascript'], '/latest.js': ['latest.js', 'text/javascript'] };
   return http.createServer(async (req, res) => {
     const incoming = new URL(req.url, 'http://localhost');
     const path = incoming.pathname;
@@ -39,5 +39,5 @@ export function createFrontendServer({ apiTarget = 'http://localhost:8080', publ
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const port = Number(process.env.PORT || 5173);
   const publicDir = process.env.NODE_ENV === 'production' ? new URL('./dist/', import.meta.url) : undefined;
-  createFrontendServer({ apiTarget: process.env.API_TARGET, publicDir }).listen(port, '127.0.0.1', () => console.log(`Frontend: http://localhost:${port}`));
+  createFrontendServer({ apiTarget: process.env.API_TARGET, publicDir }).listen(port, process.env.HOST || '127.0.0.1', () => console.log(`Frontend: http://localhost:${port}`));
 }

@@ -1,0 +1,79 @@
+name: transcreve
+services:
+  db:
+    image: postgres:18-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transcricao
+      POSTGRES_USER: transcreve
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U transcreve -d transcricao']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/transcricao
+      SPRING_DATASOURCE_USERNAME: transcreve
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Defina GEMINI_API_KEY}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Defina ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD}
+      APP_UPLOAD_DIR: /data/uploads
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+    volumes:
+      - uploads:/data/uploads
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:8080/auth/csrf]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Defina SITE_ADDRESS com seu hostname}
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+      - '${HTTPS_PORT:-443}:443/udp'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+  backup:
+    profiles: [ops]
+    build:
+      context: ..
+      dockerfile: deploy/backup.Dockerfile
+    environment:
+      PGPASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD}
+    volumes:
+      - uploads:/data/uploads
+      - ./data/backups:/backups
+      - ./data/restores:/restores
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  postgres:
+  uploads:
+  caddy_data:
+  caddy_config:

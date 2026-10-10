@@ -53,3 +53,37 @@ jobs:
           persist-credentials: false
       - name: Testes de integridade e proteções do backup
         run: python3 -m unittest discover -s tools/backup -v
+  deployment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DB_PASSWORD: ci-database-password-only
+      GEMINI_API_KEY: ci-invalid-key-no-provider-calls
+      ADMIN_EMAIL: ci@example.com
+      ADMIN_PASSWORD: ci-admin-password-only
+      SITE_ADDRESS: localhost
+      HTTP_PORT: '18080'
+      HTTPS_PORT: '18443'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validar e subir pacote de implantação isolado
+        run: |
+          docker compose -f deploy/compose.yml config --quiet
+          docker compose -f deploy/compose.yml build backup
+          docker compose -f deploy/compose.yml up -d --build --wait --wait-timeout 180
+      - name: Conferir HTTPS, sessão segura e CSRF no proxy
+        run: |
+          mkdir -p /tmp/transcreve-ci
+          for attempt in $(seq 1 15); do
+            docker compose -f deploy/compose.yml cp web:/data/caddy/pki/authorities/local/root.crt /tmp/transcreve-ci/root.crt && break
+            sleep 2
+          done
+          python3 tools/deploy/smoke.py https://localhost:18443 --ca-file /tmp/transcreve-ci/root.crt
+          docker compose -f deploy/compose.yml restart backend
+          docker compose -f deploy/compose.yml up -d --wait --wait-timeout 180
+          python3 tools/deploy/smoke.py https://localhost:18443 --ca-file /tmp/transcreve-ci/root.crt
+      - name: Encerrar ambiente temporário do runner
+        if: always()
+        run: docker compose -f deploy/compose.yml down -v

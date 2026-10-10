@@ -131,8 +131,12 @@ exportar `.txt` são operações do frontend sobre o texto recebido.
 }
 ```
 
-Quando há resultados, `itens` contém objetos de transcrição completos, inclusive
-o texto. O tamanho é fixo em 20; a ordenação é `criadoEm DESC, id DESC`. Página
+Quando há resultados, `itens` contém apenas metadados: `id`, `nomeArquivoOriginal`,
+`status`, `mensagemErro`, `codigoErro`, `erroRepetivel`, `totalPartes`,
+`partesConcluidas`, `criadoEm` e `atualizadoEm`. O campo `texto` não está presente.
+A consulta usa projeção no banco, sem carregar textos completos ou caminhos.
+O detalhe `GET /transcricoes/{id}` mantém o texto integral. A home busca apenas
+o detalhe da última concluída e reutiliza esse resultado durante a sessão. O tamanho é fixo em 20; a ordenação é `criadoEm DESC, id DESC`. Página
 negativa retorna `400`; o índice começa em zero.
 
 ## Reprocessar uma transcrição

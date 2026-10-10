@@ -1,3 +1,4 @@
+import { createLatestLoader } from './latest.js';
 import { escapeHtml as h, STATUS, emAndamento, validarArquivo, mensagemErro, orientacaoErro } from './core.js';
 const app = document.querySelector('#app');
 const detail = document.querySelector('#detail-dialog');
@@ -6,6 +7,8 @@ const state = { user: null, csrf: null, page: 0, jobs: [], pages: 0, total: 0, f
 let recorder, recordingStream, recordingTimer, recordingStarted, recordedUrl;
 let poll, refreshBusy = false, toastTimer;
 let detailOpenerSelector;
+const latestLoader = createLatestLoader(id => request(`/transcricoes/${encodeURIComponent(id)}`));
+let latestRenderedKey = null;
 function focusSelector(element) {
   return element.id ? '#' + CSS.escape(element.id)
     : element.dataset.job ? '[data-job="' + CSS.escape(element.dataset.job) + '"]'
@@ -59,7 +62,7 @@ function navigate(view) {
 function showLogin() {
   stopRecording(); if (recordedUrl) URL.revokeObjectURL(recordedUrl);
   document.querySelector('#skip-content').href = '#login-form';
-  state.epoch++; state.user = null; state.csrf = null; state.jobs = []; state.recentJobs = []; state.selected = null; state.file = null; state.busy = false; clearInterval(poll); detail.close(); userDialog.close();
+  state.epoch++; latestLoader.clear(); latestRenderedKey = null; state.user = null; state.csrf = null; state.jobs = []; state.recentJobs = []; state.selected = null; state.file = null; state.busy = false; clearInterval(poll); detail.close(); userDialog.close();
   app.innerHTML = `<div class="login"><section class="login-story">${brand}<div><h1>Do áudio<br>ao <em>texto.</em></h1><p class="muted">Transforme aulas, conversas e reuniões em texto. Mais tempo para ouvir. Menos tempo para anotar.</p><div class="wave-art" aria-hidden="true">${wave(40)}</div></div><footer>GRAVE. TRANSCREVA. EXPORTE.</footer></section><section class="login-form-wrap"><form class="login-form" id="login-form" tabindex="-1" aria-label="Acesse sua conta"><p class="eyebrow">TRANSCRIÇÃO DE ÁUDIO</p><h2>Acesse sua conta.</h2><p class="muted">Entre na sua conta para continuar.</p><div class="field"><label for="email">E-mail</label><input id="email" aria-describedby="login-error" type="email" autocomplete="username" placeholder="voce@exemplo.com" required></div><div class="field"><label for="password">Senha</label><div class="password-field"><input id="password" aria-describedby="login-error" type="password" autocomplete="current-password" placeholder="Sua senha" required><button type="button" class="password-toggle" id="toggle-password" aria-label="Mostrar senha">${icon('eye')}</button></div></div><button class="primary" id="login-button">Entrar ${icon('arrow')}</button><p id="login-error" class="error" role="alert"></p><p class="restricted-note">Ainda não tem acesso?<br>Peça ao administrador para criar sua conta.</p></form></section></div>`;
   document.querySelector('#toggle-password').onclick = event => { const field = document.querySelector('#password'); field.type = field.type === 'password' ? 'text' : 'password'; event.currentTarget.setAttribute('aria-label', field.type === 'password' ? 'Mostrar senha' : 'Ocultar senha'); };
   document.querySelector('#login-form').onsubmit = async event => {
@@ -119,7 +122,7 @@ function renderContent() {
   document.querySelector('#mode-upload').onclick = () => { stopRecording(); state.mode = 'upload'; updateMode(); };
   document.querySelector('#mode-record').onclick = () => { state.mode = 'record'; updateMode(); };
   document.querySelector('#record-button').onclick = record;
-  updateMode(); updateFile(); renderHistory(); renderRecents(); renderLatest();
+  updateMode(); updateFile(); renderHistory(); renderRecents(); latestRenderedKey = null; renderLatest();
 }
 function selectFile(file) { const error = validarArquivo(file); document.querySelector('#upload-error').textContent = error || ''; if (!error) { state.file = file; updateFile(); } }
 function updateFile() {
@@ -197,15 +200,25 @@ function renderRecents() {
   root.querySelectorAll('[data-recent]').forEach(el => el.onclick = async () => { try { state.selected = await request(`/transcricoes/${encodeURIComponent(el.dataset.recent)}`); renderDetail(); detail.showModal(); } catch (e) { toast(e.message, true); } });
   restoreFocus();
 }
-function renderLatest() {
+async function renderLatest() {
   const root = document.querySelector('#latest-section'); if (!root) return;
-  const restoreFocus = preserveFocus(root);
   const latest = (state.recentJobs || []).find(job => job.status === 'CONCLUIDA');
-  if (!latest) { root.innerHTML = `<p class="latest-eyebrow">RESULTADO DA TRANSCRIÇÃO</p><h2>Sua transcrição aparece aqui.</h2><p class="muted">Quando sua primeira transcrição ficar pronta, ela aparecerá aqui.</p>`; restoreFocus(); return; }
-  root.innerHTML = `<p class="latest-eyebrow">SUA ÚLTIMA TRANSCRIÇÃO</p><div class="section-heading"><h2>${h(latest.nomeArquivoOriginal)}</h2><div class="latest-actions"><button class="secondary" id="copy-latest">${icon('copy')} Copiar</button><button class="secondary" id="download-latest">${icon('download')} Exportar</button></div></div><div class="latest-text">${h((latest.texto || '').slice(0, 800))}${latest.texto?.length > 800 ? '…' : ''}</div><button class="text-link" id="open-latest">Ler transcrição completa ${icon('arrow')}</button>`;
-  document.querySelector('#copy-latest').onclick = () => copyText(latest.texto);
-  document.querySelector('#download-latest').onclick = () => downloadText(latest);
-  document.querySelector('#open-latest').onclick = () => { state.selected = latest; renderDetail(); detail.showModal(); };
+  if (!latest) { latestRenderedKey = null; latestLoader.clear(); root.innerHTML = `<p class="latest-eyebrow">RESULTADO DA TRANSCRIÇÃO</p><h2>Sua transcrição aparece aqui.</h2><p class="muted">Quando sua primeira transcrição ficar pronta, ela aparecerá aqui.</p>`; return; }
+  const key = `${latest.id}:${latest.atualizadoEm}`;
+  if (latestRenderedKey === key) return;
+  const epoch = state.epoch;
+  root.innerHTML = '<p class="muted" role="status">Carregando última transcrição…</p>';
+  let full;
+  try { full = await latestLoader.load(latest); }
+  catch { if (epoch === state.epoch && root.isConnected) { root.innerHTML = '<p class="muted">Não foi possível carregar a última transcrição.</p><button class="secondary" id="retry-latest">Tentar novamente</button>'; root.querySelector('#retry-latest').onclick = () => renderLatest(); } return; }
+  const current = (state.recentJobs || []).find(job => job.status === 'CONCLUIDA');
+  if (!full || epoch !== state.epoch || !root.isConnected || `${current?.id}:${current?.atualizadoEm}` !== key) return;
+  latestRenderedKey = key;
+  const restoreFocus = preserveFocus(root);
+  root.innerHTML = `<p class="latest-eyebrow">SUA ÚLTIMA TRANSCRIÇÃO</p><div class="section-heading"><h2>${h(latest.nomeArquivoOriginal)}</h2><div class="latest-actions"><button class="secondary" id="copy-latest">${icon('copy')} Copiar</button><button class="secondary" id="download-latest">${icon('download')} Exportar</button></div></div><div class="latest-text">${h((full.texto || '').slice(0, 800))}${full.texto?.length > 800 ? '…' : ''}</div><button class="text-link" id="open-latest">Ler transcrição completa ${icon('arrow')}</button>`;
+  document.querySelector('#copy-latest').onclick = () => copyText(full.texto);
+  document.querySelector('#download-latest').onclick = () => downloadText(full);
+  document.querySelector('#open-latest').onclick = () => { state.selected = full; renderDetail(); detail.showModal(); };
   restoreFocus();
 }
 async function copyText(text) { try { await navigator.clipboard.writeText(text || ''); toast('Texto copiado.'); } catch { toast('Não foi possível copiar. Você pode selecionar o texto da transcrição.', true); } }

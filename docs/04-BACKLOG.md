@@ -147,7 +147,7 @@ e [contrato de erros](02-CONTRATO%20DA%20API.md).
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |
 | P07 — melhorias entregues; ampliar validação | Acessibilidade e compatibilidade | Teclado, foco, semântica e layout em Chromium; falta conferência com leitores de tela reais e outros navegadores/dispositivos. |
-| P08 | Histórico mais leve | Listagem sem textos completos; consulta de detalhe fornece texto, mantendo recursos da home. |
+| P08 — entregue | Histórico mais leve | Listagem sem textos completos; consulta de detalhe fornece texto, mantendo recursos da home. |
 | P09 | Gestão de contas | Definir troca/recuperação de senha e bloqueio de acesso antes de criar novos endpoints. |
 | P10 | Pesquisa e organização | Definir busca, renomeação ou filtros conforme necessidade real dos usuários. |
 | P11 — configurado | Integração contínua | Workflow para push/PR/manual, suíte isolada, frontend/build e backup, sem banco de uso ou chave Gemini. |
@@ -156,7 +156,7 @@ e [contrato de erros](02-CONTRATO%20DA%20API.md).
 
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |
-| P12 | Implantação pública | Ambiente definido, HTTPS, cookie seguro, proxy, secrets e dados persistentes. |
+| P12 — pacote preparado; publicar | Implantação pública | Ambiente definido, HTTPS, cookie seguro, proxy, secrets e dados persistentes. |
 | P13 | Medir objetivos de serviço | Coletar indicadores antes de definir SLO/SLA e estimativas de processamento. |
 | P14 | Avisos de conclusão | Definir primeiro aviso na interface; canais externos dependem de consentimento e escopo. |
 | P15 | Várias instâncias | Coordenação de jobs e armazenamento compartilhado, sem processamento duplicado. |
@@ -164,7 +164,7 @@ e [contrato de erros](02-CONTRATO%20DA%20API.md).
 
 ## Decisões em aberto
 
-- Hospedagem e custos de operação.
+- Oracle Always Free escolhida; criação da conta, capacidade da VM e DNS pendentes.
 - Reprocessamento definido: mesmo job e dono, original disponível, sem nova cota de upload; chamadas restantes continuam sujeitas à cota do provedor.
 - Retenção e exclusão de dados.
 - Retenção local definida: 30 dias sugeridos para originais em erro; limpeza manual
@@ -174,3 +174,18 @@ e [contrato de erros](02-CONTRATO%20DA%20API.md).
 
 Atualizar este documento ao concluir trabalhos e revisar os demais contratos quando
 uma mudança alterar comportamento, schema ou requisitos de execução.
+
+### P08 e preparação de P12 — 10/10/2026
+
+P08: projeção de metadados no banco, detalhe completo e cache limitado ao último
+resultado da home; cache limpo no logout. Passaram 66 testes isolados de backend
+e 10 de frontend e o build. A prévia com dados fictícios confirmou detalhe e
+exportação de 3.200 caracteres sem truncamento. Nenhuma chamada Gemini.
+
+P12: Dockerfiles, Compose, Caddy HTTPS, perfil de cookies seguros, volumes e
+ferramenta de backup. Compose validado sintaticamente com credenciais fictícias.
+Workflow ampliado para subir o pacote isolado e validar HTTPS/CSRF/sessão após
+reinício. O mecanismo Linux do Docker local não iniciou; a execução dos containers
+e o novo job do CI ainda não foram confirmados. Conta Oracle, VM, DNS e testes
+no servidor real continuam pendentes; não há publicação pública concluída.
+Roteiro: [implantação](08-IMPLANTACAO.md).
