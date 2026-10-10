@@ -23,15 +23,18 @@ para o projeto, sem datas de entrega.
 - [x] Bootstrap do primeiro administrador pelo ambiente.
 - [x] Isolamento de transcrições por dono e histórico paginado.
 - [x] Repositório organizado em `backend/` e `frontend/`.
-- [x] Interface Voz em Flor: login, upload, histórico, gravação, cópia/exportação e administração.
+- [x] Interface Transcreve: login, upload, histórico, gravação, cópia/exportação e administração.
 - [x] Testes do backend e do proxy/validações do frontend.
 - [x] README e documentos de arquitetura, dados, API e operação.
+- [x] Identidade Transcreve: nome, símbolo de áudio, paleta azul/grafite/cinza,
+  textos objetivos e banner do README atualizados em 10/10/2026.
 
 ## Próxima etapa — validar o frontend integrado
 
 O login, logout, navegação, formulário do admin e layout em desktop/celular foram
-conferidos no navegador. Upload e gravação existem no código, mas sua validação
-real ponta a ponta pelo frontend ainda está pendente.
+conferidos no navegador. O upload foi validado ponta a ponta com áudio sintético
+em 10/10/2026. O usuário também confirmou gravação, reprodução da prévia, envio
+e recebimento da transcrição com voz natural no navegador externo nessa data.
 
 | ID | Trabalho | Critério de conclusão |
 | --- | --- | --- |
@@ -42,6 +45,33 @@ real ponta a ponta pelo frontend ainda está pendente.
 | V05 | Falhas e cotas na interface | Sessão expirada, backend indisponível, arquivo inválido e sexto envio têm resposta clara. |
 
 Usar conta e áudios de teste; chamadas reais ao Gemini consomem a cota do provedor.
+
+### Validação de 10/10/2026
+
+- **V01 validado com áudio sintético:** seleção de WAV pelo navegador, envio com
+  progresso até 100%, processamento com FFmpeg e Gemini, atualização do histórico
+  e abertura do texto concluído. A cota passou de cinco para quatro arquivos.
+  Duas tentativas de transcrição falharam antes da conclusão automática.
+- **V03 parcialmente validado:** exportação pela home gerou `teste-interface.txt`
+  com conteúdo completo e acentuação correta. A cópia mostrou confirmação de
+  sucesso, mas a colagem automatizada não coincidiu com o texto; verificar
+  manualmente e distinguir falha da aplicação de limitação da automação.
+- **V02 validado pelo usuário no navegador externo:** gravação com microfone,
+  parada, reprodução da prévia, envio e recebimento da transcrição funcionaram.
+  A primeira gravação silenciosa ocorreu com o microfone mutado, conforme
+  identificado pelo usuário. A liberação do microfone após parar ainda não foi
+  conferida diretamente.
+- **Fidelidade observada:** na gravação com voz natural, o usuário relatou que
+  o provedor transcreveu “flow” em vez de “Flor”, no nome anterior do produto.
+  Registrar como exemplo para
+  P01; esse teste isolado não mede a qualidade geral da transcrição.
+- **V05 parcialmente validado:** arquivos `.txt` e WAV vazio foram rejeitados na
+  interface, mantendo o botão de envio desabilitado e a cota em quatro.
+- **Verificações automatizadas:** 47 testes isolados do backend e sete testes do
+  frontend passaram; build do frontend concluído.
+- **Pendentes:** liberação do microfone em V02, V04, demais cenários de V05 e
+  confirmação da cópia em V03.
+  O áudio sintético valida o fluxo; não mede fidelidade de fala natural.
 
 ## Prioridade 1 — confiabilidade e qualidade
 

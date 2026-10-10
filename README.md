@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="docs/assets/voz-em-flor.svg" alt="Voz em Flor — transforme voz em palavras que ficam" width="100%">
+  <img src="docs/assets/transcreve.svg" alt="Transcreve — áudio em texto" width="100%">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Java-25-352d3d?style=flat-square" alt="Java 25">
-  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-352d3d?style=flat-square" alt="Spring Boot 4.1.1">
+  <img src="https://img.shields.io/badge/Java-25-14202e?style=flat-square" alt="Java 25">
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-14202e?style=flat-square" alt="Spring Boot 4.1.1">
   <img src="https://img.shields.io/badge/PostgreSQL-18-4169e1?style=flat-square" alt="PostgreSQL 18">
-  <img src="https://img.shields.io/badge/Node.js-22%2B-352d3d?style=flat-square" alt="Node.js 22 ou superior">
-  <img src="https://img.shields.io/badge/Status-em_desenvolvimento-ac6e8c?style=flat-square" alt="Em desenvolvimento">
+  <img src="https://img.shields.io/badge/Node.js-22%2B-14202e?style=flat-square" alt="Node.js 22 ou superior">
+  <img src="https://img.shields.io/badge/Status-em_desenvolvimento-2563eb?style=flat-square" alt="Em desenvolvimento">
 </p>
 
 <p align="center">
@@ -18,11 +18,11 @@
   <a href="#documentação">Documentação</a>
 </p>
 
-# Voz em Flor
+# Transcreve
 
-**Transforme voz em palavras que ficam.**
+**Áudio em texto. Sem complicação.**
 
-Voz em Flor é uma aplicação para transcrever áudios em português: aulas, reuniões, conversas e outras falas que você quer guardar em texto. Envie um arquivo ou grave pelo navegador, acompanhe o processamento e copie ou exporte o resultado.
+Transcreve é uma aplicação para transcrever áudios em português: aulas, reuniões, conversas e outras falas que você quer guardar em texto. Envie um arquivo ou grave pelo navegador, acompanhe o processamento e copie ou exporte o resultado.
 
 O projeto nasceu para uso pessoal e de amigos, e também como portfólio de desenvolvimento. Combina um backend Java com processamento assíncrono, uma interface em HTML, CSS e JavaScript e integração com a API do Gemini.
 

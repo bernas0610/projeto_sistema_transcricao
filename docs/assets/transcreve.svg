@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="290" viewBox="0 0 1200 290" role="img" aria-labelledby="title description">
+  <title id="title">Transcreve</title>
+  <desc id="description">Áudio em texto. Identidade em azul, grafite e cinza.</desc>
+  <rect width="1200" height="290" rx="14" fill="#f5f7fa"/>
+  <path d="M14 0H350V290H14Q0 290 0 276V14Q0 0 14 0" fill="#14202e"/>
+  <rect x="42" y="52" width="48" height="48" rx="10" fill="#2563eb"/>
+  <path d="M54 73v6m6-12v18m6-24v30m6-24v18m6-12v6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <text x="42" y="151" fill="#fff" font-family="Segoe UI,Arial,sans-serif" font-size="39" font-weight="700">Transcreve</text>
+  <text x="43" y="184" fill="#94a3b8" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="2">ÁUDIO EM TEXTO</text>
+  <g stroke="#60a5fa" stroke-width="5" stroke-linecap="round"><path d="M45 232v8m15-17v26m15-34v42m15-34v26m15-19v12m15-8v4m15-12v20m15-31v42m15-35v28m15-22v16"/></g>
+  <text x="410" y="66" fill="#475569" font-family="Segoe UI,Arial,sans-serif" font-size="12" letter-spacing="2">GRAVE. TRANSCREVA. EXPORTE.</text>
+  <text x="406" y="134" fill="#172333" font-family="Segoe UI,Arial,sans-serif" font-size="49" font-weight="700">Do áudio ao texto.</text>
+  <text x="406" y="192" fill="#2563eb" font-family="Segoe UI,Arial,sans-serif" font-size="49" font-weight="700">Sem complicação.</text>
+  <text x="410" y="240" fill="#64748b" font-family="Segoe UI,Arial,sans-serif" font-size="16">Envie um arquivo ou grave pelo microfone.</text>
+</svg>

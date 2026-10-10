@@ -4,12 +4,20 @@
 
 ## Objetivo e escopo
 
-Voz em Flor transforma áudio em texto para uso pessoal e de um grupo pequeno de
+Transcreve transforma áudio em texto para uso pessoal e de um grupo pequeno de
 pessoas. A implementação atual é um monólito Spring Boot com interface web
 separada, servidor Node.js e integração externa com o Gemini. A execução documentada
 é local e usa uma única instância de backend.
 
 ## Visão geral
+
+### Identidade da interface
+
+O produto se chama **Transcreve**. A interface usa tipografia sem serifa,
+grafite na navegação, azul nas ações e superfícies em branco e cinza. O símbolo
+representa uma onda sonora. Os textos priorizam instruções diretas de gravação,
+envio, consulta e exportação. O tema fica em `frontend/public/theme.css`, e o
+banner correspondente do README fica em `docs/assets/transcreve.svg`.
 
 ```mermaid
 flowchart LR
