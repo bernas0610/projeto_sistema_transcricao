@@ -236,6 +236,8 @@ O projeto está em desenvolvimento e a execução documentada é local. Para pub
 | [04 — Backlog](docs/04-BACKLOG.md) | Entregas, validações pendentes, prioridades sugeridas e decisões em aberto. |
 | [05 — Observabilidade](docs/05-OBSERVABILIDADE.md) | Eventos de fila, partes, retries e duração; consulta segura dos logs. |
 | [Fidelidade](docs/fidelidade/README.md) | Referências para gravação, avaliação offline e limites da métrica. |
+| [06 — Backup e retenção](docs/06-BACKUP-E-RETENCAO.md) | Backup offline, restauração isolada e limpeza manual com verificação. |
+| [07 — Acessibilidade e CI](docs/07-ACESSIBILIDADE-E-CI.md) | Navegação por teclado, compatibilidade verificada e testes no GitHub. |
 
 ---
 

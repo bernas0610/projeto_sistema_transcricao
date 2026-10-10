@@ -33,6 +33,9 @@ build/
 .vscode/
 
 uploads/
+backups/
+restored-uploads/
+**/__pycache__/
 teste*.mp3
 
 frontend/node_modules/

@@ -26,6 +26,12 @@ para o projeto, sem datas de entrega.
   sem publicar resposta bruta do provedor, conteúdo de áudio ou credenciais.
 - [x] P01 — preparação: cinco referências para gravação e comparador offline de
   WER, omissões, substituições e inserções. Medição com voz real continua pendente.
+- [x] P06: backup offline do PostgreSQL e originais necessários, hashes, restauração
+  em banco/pasta novos, retenção manual simulada por padrão e teste real de round trip.
+- [x] P07 — melhorias: atalho de conteúdo, foco durante polling, controles identificados,
+  contraste do histórico e alvos móveis; compatibilidade ampliada continua em validação.
+- [x] P11: workflow para suíte isolada do backend, testes/build do frontend e proteções
+  de backup, sem secrets de produção ou chamadas reais ao Gemini.
 - [x] Tratamento específico de cota diária explícita do Gemini.
 - [x] Autenticação por sessão, BCrypt e CSRF.
 - [x] Limite diário de cinco arquivos por usuário, com reserva transacional.
@@ -120,7 +126,7 @@ navegador com respostas simuladas; nenhuma chamada real ao Gemini foi feita.
 | P03 — entregue | Reprocessamento de jobs com erro | Dono reenfileira o mesmo job com original disponível; bloqueio transacional impede pedidos simultâneos e não reserva nova cota de upload. |
 | P04 — entregue | Contrato de erros uniforme | Envelope com status/code/message/retryable; jobs têm código e orientação por causa; segurança também retorna JSON. |
 | P05 — entregue | Observabilidade do processamento | Eventos de início, fim, fila, partes, tentativas e causas; correlação MDC e testes contra vazamento. |
-| P06 | Backups e retenção | Definir retenção de originais com erro e procedimento de backup/restauração de banco e arquivos. |
+| P06 — entregue | Backups e retenção | Backup íntegro, caminhos reconstruídos ao restaurar e limpeza manual de erros com backup conferido; padrão ajustável de 30 dias. |
 
 ## Prioridade 2 — experiência e manutenção
 
@@ -140,11 +146,11 @@ e [contrato de erros](02-CONTRATO%20DA%20API.md).
 
 | ID | Proposta | Critério de aceitação |
 | --- | --- | --- |
-| P07 | Acessibilidade e compatibilidade | Conferir teclado, foco, leitor de tela, contraste e gravação nos navegadores escolhidos. |
+| P07 — melhorias entregues; ampliar validação | Acessibilidade e compatibilidade | Teclado, foco, semântica e layout em Chromium; falta conferência com leitores de tela reais e outros navegadores/dispositivos. |
 | P08 | Histórico mais leve | Listagem sem textos completos; consulta de detalhe fornece texto, mantendo recursos da home. |
 | P09 | Gestão de contas | Definir troca/recuperação de senha e bloqueio de acesso antes de criar novos endpoints. |
 | P10 | Pesquisa e organização | Definir busca, renomeação ou filtros conforme necessidade real dos usuários. |
-| P11 | Integração contínua | Executar suíte isolada e build do frontend no CI, sem banco real ou chave Gemini. |
+| P11 — configurado | Integração contínua | Workflow para push/PR/manual, suíte isolada, frontend/build e backup, sem banco de uso ou chave Gemini. |
 
 ## Prioridade 3 — implantação e expansão
 
@@ -161,6 +167,8 @@ e [contrato de erros](02-CONTRATO%20DA%20API.md).
 - Hospedagem e custos de operação.
 - Reprocessamento definido: mesmo job e dono, original disponível, sem nova cota de upload; chamadas restantes continuam sujeitas à cota do provedor.
 - Retenção e exclusão de dados.
+- Retenção local definida: 30 dias sugeridos para originais em erro; limpeza manual
+  com simulação e backup verificado. Automatização e retenção de backups ficam para implantação.
 - Necessidade de timestamps e identificação de falantes.
 - Necessidade de notificações externas e canais permitidos.
 

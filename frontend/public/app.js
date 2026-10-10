@@ -5,6 +5,18 @@ const userDialog = document.querySelector('#user-dialog');
 const state = { user: null, csrf: null, page: 0, jobs: [], pages: 0, total: 0, file: null, busy: false, epoch: 0, selected: null, tab: 'home', mode: 'upload' };
 let recorder, recordingStream, recordingTimer, recordingStarted, recordedUrl;
 let poll, refreshBusy = false, toastTimer;
+let detailOpenerSelector;
+function focusSelector(element) {
+  return element.id ? '#' + CSS.escape(element.id)
+    : element.dataset.job ? '[data-job="' + CSS.escape(element.dataset.job) + '"]'
+    : element.dataset.recent ? '[data-recent="' + CSS.escape(element.dataset.recent) + '"]'
+    : element.classList.contains('close-dialog') ? '.close-dialog' : null;
+}
+detail.addEventListener('close', () => {
+  if (!state.user) return;
+  const opener = detailOpenerSelector && document.querySelector(detailOpenerSelector);
+  (opener?.getClientRects().length ? opener : document.querySelector('#main-content'))?.focus({ preventScroll: true });
+});
 const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({ upload: '<path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/>', file: '<path d="M14 3H6v18h12V7l-4-4Z"/><path d="M14 3v5h4M9 12h6m-6 4h6"/>', arrow: '<path d="m9 5 7 7-7 7"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>', users: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5"/>', logout: '<path d="M9 4H4v16h5m5-12 4 4-4 4m-6-4h10"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>', copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>', download: '<path d="M12 3v13m-5-5 5 5 5-5M4 20h16"/>', refresh: '<path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/>' })[name]}</svg>`;
 const brand = '<div class="brand"><span class="signal-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10v4m4-7v10m4-13v16m4-13v10m4-7v4"/></svg></span>Transcreve</div>';
 const wave = (count = 27) => Array.from({ length: count }, (_, i) => `<i style="height:${12 + Math.abs(Math.sin(i * 1.7)) * (i < count / 2 ? i + 2 : count - i + 1) * 6}px"></i>`).join('');
@@ -30,10 +42,25 @@ async function request(url, { method = 'GET', body, context = '' } = {}) {
   } catch (error) { if (error instanceof TypeError) throw new Error('Não foi possível conectar. Verifique sua conexão e se o backend está rodando.'); throw error; }
 }
 async function csrf() { state.csrf = await request('/auth/csrf'); }
+function preserveFocus(root) {
+  const previous = document.activeElement;
+  if (!root?.contains(previous)) return () => {};
+  const selector = focusSelector(previous);
+  return () => {
+    if (previous.isConnected) return;
+    const target = selector && root.querySelector(selector) || root.querySelector('button') || root;
+    if (target === root) root.tabIndex = -1;
+    target.focus({ preventScroll: true });
+  };
+}
+function navigate(view) {
+  stopRecording(); state.tab = view; renderContent(); document.querySelector('#main-content')?.focus();
+}
 function showLogin() {
   stopRecording(); if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+  document.querySelector('#skip-content').href = '#login-form';
   state.epoch++; state.user = null; state.csrf = null; state.jobs = []; state.recentJobs = []; state.selected = null; state.file = null; state.busy = false; clearInterval(poll); detail.close(); userDialog.close();
-  app.innerHTML = `<div class="login"><section class="login-story">${brand}<div><h1>Do áudio<br>ao <em>texto.</em></h1><p class="muted">Transforme aulas, conversas e reuniões em texto. Mais tempo para ouvir. Menos tempo para anotar.</p><div class="wave-art" aria-hidden="true">${wave(40)}</div></div><footer>GRAVE. TRANSCREVA. EXPORTE.</footer></section><section class="login-form-wrap"><form class="login-form" id="login-form"><p class="eyebrow">TRANSCRIÇÃO DE ÁUDIO</p><h2>Acesse sua conta.</h2><p class="muted">Entre na sua conta para continuar.</p><div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" placeholder="voce@exemplo.com" required></div><div class="field"><label for="password">Senha</label><div class="password-field"><input id="password" type="password" autocomplete="current-password" placeholder="Sua senha" required><button type="button" class="password-toggle" id="toggle-password" aria-label="Mostrar senha">${icon('eye')}</button></div></div><button class="primary" id="login-button">Entrar ${icon('arrow')}</button><p id="login-error" class="error" role="alert"></p><p class="restricted-note">Ainda não tem acesso?<br>Peça ao administrador para criar sua conta.</p></form></section></div>`;
+  app.innerHTML = `<div class="login"><section class="login-story">${brand}<div><h1>Do áudio<br>ao <em>texto.</em></h1><p class="muted">Transforme aulas, conversas e reuniões em texto. Mais tempo para ouvir. Menos tempo para anotar.</p><div class="wave-art" aria-hidden="true">${wave(40)}</div></div><footer>GRAVE. TRANSCREVA. EXPORTE.</footer></section><section class="login-form-wrap"><form class="login-form" id="login-form" tabindex="-1" aria-label="Acesse sua conta"><p class="eyebrow">TRANSCRIÇÃO DE ÁUDIO</p><h2>Acesse sua conta.</h2><p class="muted">Entre na sua conta para continuar.</p><div class="field"><label for="email">E-mail</label><input id="email" aria-describedby="login-error" type="email" autocomplete="username" placeholder="voce@exemplo.com" required></div><div class="field"><label for="password">Senha</label><div class="password-field"><input id="password" aria-describedby="login-error" type="password" autocomplete="current-password" placeholder="Sua senha" required><button type="button" class="password-toggle" id="toggle-password" aria-label="Mostrar senha">${icon('eye')}</button></div></div><button class="primary" id="login-button">Entrar ${icon('arrow')}</button><p id="login-error" class="error" role="alert"></p><p class="restricted-note">Ainda não tem acesso?<br>Peça ao administrador para criar sua conta.</p></form></section></div>`;
   document.querySelector('#toggle-password').onclick = event => { const field = document.querySelector('#password'); field.type = field.type === 'password' ? 'text' : 'password'; event.currentTarget.setAttribute('aria-label', field.type === 'password' ? 'Mostrar senha' : 'Ocultar senha'); };
   document.querySelector('#login-form').onsubmit = async event => {
     event.preventDefault(); const button = document.querySelector('#login-button'), error = document.querySelector('#login-error'); error.textContent = ''; button.disabled = true; button.textContent = 'Entrando…';
@@ -42,11 +69,12 @@ function showLogin() {
   };
 }
 function renderShell() {
-  app.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<nav><button class="nav-button active" id="nav-home">⌂ <span>Início</span></button><button class="nav-button" id="nav-jobs">${icon('file')} Minhas transcrições</button>${state.user.role === 'ADMIN' ? `<button class="nav-button" id="nav-users">${icon('users')} Usuários</button>` : ''}</nav><div class="recent-heading">RECENTES</div><div id="recents"></div><div class="sidebar-bottom"><div class="quota-side" id="quota-side"></div><div class="sidebar-account"><div class="account-avatar">${h(state.user.email.slice(0, 1).toUpperCase())}</div><div class="account-copy"><div class="account-email">${h(state.user.email)}</div><div class="account-role">${state.user.role === 'ADMIN' ? 'Administrador' : 'Conta pessoal'}</div></div><button class="logout" id="logout" aria-label="Sair da conta">${icon('logout')}</button></div></div></aside><div class="workspace"><header class="topbar"><p class="breadcrumb" id="breadcrumb-page">Início</p><div class="topbar-actions"><span class="privacy-note"><i></i> Suas transcrições ficam só com você</span><button class="primary" id="new-transcription"><span aria-hidden="true">＋</span> Nova transcrição</button><button class="logout mobile-logout" id="mobile-logout" aria-label="Sair da conta">${icon('logout')}</button></div></header><main class="main" id="main-content"></main></div></div>`;
-  document.querySelector('#nav-home').onclick = () => { stopRecording(); state.tab = 'home'; renderContent(); };
+  document.querySelector('#skip-content').href = '#main-content';
+  app.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<nav aria-label="Navegação principal"><button class="nav-button active" id="nav-home">⌂ <span>Início</span></button><button class="nav-button" id="nav-jobs">${icon('file')} Minhas transcrições</button>${state.user.role === 'ADMIN' ? `<button class="nav-button" id="nav-users">${icon('users')} Usuários</button>` : ''}</nav><div class="recent-heading">RECENTES</div><div id="recents"></div><div class="sidebar-bottom"><div class="quota-side" id="quota-side"></div><div class="sidebar-account"><div class="account-avatar">${h(state.user.email.slice(0, 1).toUpperCase())}</div><div class="account-copy"><div class="account-email">${h(state.user.email)}</div><div class="account-role">${state.user.role === 'ADMIN' ? 'Administrador' : 'Conta pessoal'}</div></div><button class="logout" id="logout" aria-label="Sair da conta">${icon('logout')}</button></div></div></aside><div class="workspace"><header class="topbar"><p class="breadcrumb" id="breadcrumb-page">Início</p><div class="topbar-actions"><span class="privacy-note"><i></i> Suas transcrições ficam só com você</span><button class="primary" id="new-transcription"><span aria-hidden="true">＋</span> Nova transcrição</button><button class="logout mobile-logout" id="mobile-logout" aria-label="Sair da conta">${icon('logout')}</button></div></header><main class="main" id="main-content" tabindex="-1" aria-label="Conteúdo principal"></main></div></div>`;
+  document.querySelector('#nav-home').onclick = () => navigate('home');
   document.querySelector('#new-transcription').onclick = () => { stopRecording(); state.tab = 'home'; state.mode = 'upload'; renderContent(); document.querySelector('#choose-file').click(); };
-  document.querySelector('#nav-jobs').onclick = () => { stopRecording(); state.tab = 'jobs'; renderContent(); };
-  document.querySelector('#nav-users')?.addEventListener('click', () => { stopRecording(); state.tab = 'users'; renderContent(); });
+  document.querySelector('#nav-jobs').onclick = () => navigate('jobs');
+  document.querySelector('#nav-users')?.addEventListener('click', () => navigate('users'));
   document.querySelector('#logout').onclick = async () => { try { await request('/auth/logout', { method: 'POST' }); showLogin(); } catch (e) { toast(e.message, true); } };
   document.querySelector('#mobile-logout').onclick = document.querySelector('#logout').onclick;
   renderContent();
@@ -57,6 +85,10 @@ function renderContent() {
   document.querySelector('#breadcrumb-page').textContent = ({ home: 'Início', jobs: 'Minhas transcrições', users: 'Usuários' })[state.tab];
   document.querySelector('#nav-home').classList.toggle('active', state.tab === 'home');
   document.querySelector('#nav-jobs').classList.toggle('active', state.tab === 'jobs'); document.querySelector('#nav-users')?.classList.toggle('active', state.tab === 'users');
+  for (const view of ['home', 'jobs', 'users']) {
+    const button = document.querySelector('#nav-' + view);
+    if (button) { if (state.tab === view) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current'); }
+  }
   const main = document.querySelector('#main-content');
   main.classList.toggle('home-content', state.tab === 'home');
   main.classList.toggle('history-content', state.tab === 'jobs');
@@ -70,7 +102,7 @@ function renderContent() {
     <section class="card upload-card">
       <div class="upload-tabs"><button id="mode-upload" class="upload-tab">${icon('upload')} Enviar áudio</button><button id="mode-record" class="upload-tab"><span aria-hidden="true">♩</span> Gravar agora</button></div>
       <div class="dropzone" id="dropzone"><div class="upload-icon">${icon('upload')}</div><button class="file-picker" id="choose-file" type="button">Escolha um áudio para transcrever</button><p class="muted">ou arraste e solte o arquivo aqui</p><p class="format-note">MP3, M4A, WAV e outros formatos · até 300 MB</p><input type="file" id="file-input" accept=".mp3,.wav,.m4a,.ogg,.flac,.aac,.webm,.opus,.mpeg" hidden></div>
-      <div class="record-panel" id="record-panel" hidden><div class="upload-icon">♩</div><h3>Grave seu áudio.</h3><p class="muted" id="record-state">Grave pelo microfone, depois envie para transcrever.</p><button class="secondary" id="record-button">Iniciar gravação</button><audio id="record-preview" controls hidden></audio></div>
+      <div class="record-panel" id="record-panel" hidden><div class="upload-icon">♩</div><h3>Grave seu áudio.</h3><p class="muted" id="record-state">Grave pelo microfone, depois envie para transcrever.</p><button class="secondary" id="record-button">Iniciar gravação</button><audio id="record-preview" aria-label="Prévia da gravação" controls hidden></audio></div>
       <div id="selected-file"></div><div id="upload-progress" hidden class="progress" role="progressbar" aria-label="Envio do áudio" aria-valuemin="0" aria-valuemax="100"><span></span></div>
       <div class="upload-footer"><p class="muted small"><span id="remaining">${remaining()} arquivos disponíveis hoje</span><br>O processamento continua mesmo se você fechar a página.</p><button class="primary" id="upload-button">${icon('upload')} Transcrever áudio</button></div><p class="error" id="upload-error" role="alert"></p>
     </section>
@@ -129,15 +161,19 @@ async function refresh() {
 }
 function renderHistory() {
   const list = document.querySelector('#history'); if (!list) return;
+  const restoreFocus = preserveFocus(list);
   document.querySelector('#history-count').textContent = `${state.total} ${state.total === 1 ? 'arquivo' : 'arquivos'}`;
   list.innerHTML = state.jobs.length ? `<div class="table-header"><span>Arquivo</span><span>Enviado em</span><span>Status</span><span></span></div>${state.jobs.map(job => `<button class="job-row" data-job="${h(job.id)}" aria-label="Abrir transcrição de ${h(job.nomeArquivoOriginal)}"><div class="file-cell"><div class="file-symbol">${icon('file')}</div><div style="min-width:0"><p class="file-title">${h(job.nomeArquivoOriginal)}</p><p class="file-id">${h(progresso(job) || 'Áudio em português')}</p></div></div><span class="job-date">${h(date(job.criadoEm))}</span><span class="status ${h(job.status)}">${h(STATUS[job.status] || job.status)}</span><span class="row-arrow">${icon('arrow')}</span></button>`).join('')}` : `<div class="empty"><div class="file-symbol">${icon('file')}</div><h3>Seu primeiro áudio começa aqui.</h3><p>Use Nova transcrição para enviar um áudio.<br>Suas transcrições aparecerão neste espaço.</p></div>`;
   list.querySelectorAll('[data-job]').forEach(el => el.onclick = async () => { try { state.selected = await request(`/transcricoes/${encodeURIComponent(el.dataset.job)}`); renderDetail(); detail.showModal(); } catch (e) { toast(e.message, true); } });
   document.querySelector('#pagination').innerHTML = state.pages > 1 ? `<span>Página ${state.page + 1} de ${state.pages}</span><div><button class="secondary" id="previous-page" ${!state.page ? 'disabled' : ''}>Anterior</button><button class="secondary" id="next-page" ${state.page + 1 >= state.pages ? 'disabled' : ''}>Próxima</button></div>` : '';
   document.querySelector('#previous-page')?.addEventListener('click', () => { state.page--; refresh().catch(e => toast(e.message, true)); }); document.querySelector('#next-page')?.addEventListener('click', () => { state.page++; refresh().catch(e => toast(e.message, true)); });
+  restoreFocus();
 }
 function renderDetail() {
+  if (!detail.open) detailOpenerSelector = focusSelector(document.activeElement);
+  const restoreFocus = preserveFocus(detail);
   const job = state.selected;
-  detail.innerHTML = `<div class="dialog-header"><div><h2 id="detail-title">${h(job.nomeArquivoOriginal)}</h2><p class="small muted">${h(date(job.criadoEm))} · <span class="status ${h(job.status)}">${h(STATUS[job.status])}</span></p>${progresso(job) ? `<p class="small muted">${h(progresso(job))}</p>` : ''}</div><button class="icon-button close-dialog" aria-label="Fechar transcrição">${icon('close')}</button></div>${job.status === 'CONCLUIDA' ? `<pre class="transcript">${h(job.texto || '')}</pre><div class="dialog-actions"><button class="secondary" id="copy-text">${icon('copy')} Copiar texto</button><button class="primary" id="download-text">${icon('download')} Baixar .txt</button></div>` : `<div class="processing-info">${job.status === 'ERRO' ? `<strong>Não foi possível concluir.</strong><br>${h(job.mensagemErro || orientacaoErro(job))}` : `<strong>${job.status === 'PENDENTE' ? 'Seu áudio está na fila.' : 'Estamos transcrevendo seu áudio.'}</strong><br>Você pode fechar esta janela. O status será atualizado automaticamente.`}</div>${job.status === 'ERRO' ? `<div class="dialog-actions"><button class="primary" id="retry-transcription">${icon('refresh')} Reprocessar áudio</button></div><p class="small muted">As partes já salvas serão reutilizadas. Não consome outro arquivo da sua cota diária.</p>` : ''}`}`;
+  detail.innerHTML = `<div class="dialog-header"><div><h2 id="detail-title">${h(job.nomeArquivoOriginal)}</h2><p class="small muted">${h(date(job.criadoEm))} · <span class="status ${h(job.status)}">${h(STATUS[job.status])}</span></p>${progresso(job) ? `<p class="small muted">${h(progresso(job))}</p>` : ''}</div><button class="icon-button close-dialog" aria-label="Fechar transcrição">${icon('close')}</button></div>${job.status === 'CONCLUIDA' ? `<pre class="transcript" tabindex="0" aria-label="Texto da transcrição">${h(job.texto || '')}</pre><div class="dialog-actions"><button class="secondary" id="copy-text">${icon('copy')} Copiar texto</button><button class="primary" id="download-text">${icon('download')} Baixar .txt</button></div>` : `<div class="processing-info">${job.status === 'ERRO' ? `<strong>Não foi possível concluir.</strong><br>${h(job.mensagemErro || orientacaoErro(job))}` : `<strong>${job.status === 'PENDENTE' ? 'Seu áudio está na fila.' : 'Estamos transcrevendo seu áudio.'}</strong><br>Você pode fechar esta janela. O status será atualizado automaticamente.`}</div>${job.status === 'ERRO' ? `<div class="dialog-actions"><button class="primary" id="retry-transcription">${icon('refresh')} Reprocessar áudio</button></div><p class="small muted">As partes já salvas serão reutilizadas. Não consome outro arquivo da sua cota diária.</p>` : ''}`}`;
   detail.querySelector('.close-dialog').onclick = () => detail.close();
   document.querySelector('#retry-transcription')?.addEventListener('click', async event => {
     const button = event.currentTarget, epoch = state.epoch; button.disabled = true; button.textContent = 'Reenfileirando…';
@@ -152,24 +188,31 @@ function renderDetail() {
   });
   document.querySelector('#copy-text')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(job.texto); toast('Texto copiado.'); } catch { toast('Não foi possível copiar. Você pode selecionar o texto acima.', true); } });
   document.querySelector('#download-text')?.addEventListener('click', () => { const url = URL.createObjectURL(new Blob([job.texto || ''], { type: 'text/plain;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = job.nomeArquivoOriginal.replace(/\.[^.]+$/, '') + '.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
+  restoreFocus();
 }
 function renderRecents() {
   const root = document.querySelector('#recents'); if (!root) return;
+  const restoreFocus = preserveFocus(root);
   root.innerHTML = (state.recentJobs || []).slice(0, 4).map(job => `<button class="recent-job" data-recent="${h(job.id)}"><span class="recent-icon">▷</span><span class="recent-copy"><strong>${h(job.nomeArquivoOriginal)}</strong><small>${h(date(job.criadoEm))}</small></span><span class="recent-status">${h(STATUS[job.status])}</span></button>`).join('') || '<p class="recent-empty">Nenhuma transcrição recente.</p>';
   root.querySelectorAll('[data-recent]').forEach(el => el.onclick = async () => { try { state.selected = await request(`/transcricoes/${encodeURIComponent(el.dataset.recent)}`); renderDetail(); detail.showModal(); } catch (e) { toast(e.message, true); } });
+  restoreFocus();
 }
 function renderLatest() {
   const root = document.querySelector('#latest-section'); if (!root) return;
+  const restoreFocus = preserveFocus(root);
   const latest = (state.recentJobs || []).find(job => job.status === 'CONCLUIDA');
-  if (!latest) { root.innerHTML = `<p class="latest-eyebrow">RESULTADO DA TRANSCRIÇÃO</p><h2>Sua transcrição aparece aqui.</h2><p class="muted">Quando sua primeira transcrição ficar pronta, ela aparecerá aqui.</p>`; return; }
+  if (!latest) { root.innerHTML = `<p class="latest-eyebrow">RESULTADO DA TRANSCRIÇÃO</p><h2>Sua transcrição aparece aqui.</h2><p class="muted">Quando sua primeira transcrição ficar pronta, ela aparecerá aqui.</p>`; restoreFocus(); return; }
   root.innerHTML = `<p class="latest-eyebrow">SUA ÚLTIMA TRANSCRIÇÃO</p><div class="section-heading"><h2>${h(latest.nomeArquivoOriginal)}</h2><div class="latest-actions"><button class="secondary" id="copy-latest">${icon('copy')} Copiar</button><button class="secondary" id="download-latest">${icon('download')} Exportar</button></div></div><div class="latest-text">${h((latest.texto || '').slice(0, 800))}${latest.texto?.length > 800 ? '…' : ''}</div><button class="text-link" id="open-latest">Ler transcrição completa ${icon('arrow')}</button>`;
   document.querySelector('#copy-latest').onclick = () => copyText(latest.texto);
   document.querySelector('#download-latest').onclick = () => downloadText(latest);
   document.querySelector('#open-latest').onclick = () => { state.selected = latest; renderDetail(); detail.showModal(); };
+  restoreFocus();
 }
 async function copyText(text) { try { await navigator.clipboard.writeText(text || ''); toast('Texto copiado.'); } catch { toast('Não foi possível copiar. Você pode selecionar o texto da transcrição.', true); } }
 function downloadText(job) { const url = URL.createObjectURL(new Blob([job.texto || ''], { type: 'text/plain;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = job.nomeArquivoOriginal.replace(/\.[^.]+$/, '') + '.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function updateMode() {
+  document.querySelector('#mode-upload').setAttribute('aria-pressed', String(state.mode === 'upload'));
+  document.querySelector('#mode-record').setAttribute('aria-pressed', String(state.mode === 'record'));
   document.querySelector('#dropzone').hidden = state.mode !== 'upload'; document.querySelector('#record-panel').hidden = state.mode !== 'record';
   document.querySelector('#mode-upload').classList.toggle('active', state.mode === 'upload'); document.querySelector('#mode-record').classList.toggle('active', state.mode === 'record');
 }
@@ -207,7 +250,7 @@ async function record() {
 }
 window.addEventListener('pagehide', stopRecording);
 function openUserDialog() {
-  userDialog.className = 'user-dialog'; userDialog.innerHTML = `<div class="dialog-header"><h2 id="user-title">Novo usuário</h2><button class="icon-button close-dialog" aria-label="Fechar cadastro">${icon('close')}</button></div><p class="muted">Defina as credenciais e compartilhe-as diretamente com a pessoa.</p><form id="create-user-form"><div class="field"><label for="new-email">E-mail</label><input id="new-email" type="email" autocomplete="off" maxlength="255" required></div><div class="field"><label for="new-password">Senha inicial</label><input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required><p class="small muted" style="margin-top:8px">Pelo menos 8 caracteres.</p></div><p class="error" id="create-user-error" role="alert"></p><div class="dialog-actions"><button class="primary" id="create-user-button">Criar acesso</button></div></form>`;
+  userDialog.className = 'user-dialog'; userDialog.innerHTML = `<div class="dialog-header"><h2 id="user-title">Novo usuário</h2><button class="icon-button close-dialog" aria-label="Fechar cadastro">${icon('close')}</button></div><p class="muted">Defina as credenciais e compartilhe-as diretamente com a pessoa.</p><form id="create-user-form"><div class="field"><label for="new-email">E-mail</label><input aria-describedby="create-user-error" id="new-email" type="email" autocomplete="off" maxlength="255" required></div><div class="field"><label for="new-password">Senha inicial</label><input aria-describedby="password-help create-user-error" id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required><p id="password-help" class="small muted" style="margin-top:8px">Pelo menos 8 caracteres.</p></div><p class="error" id="create-user-error" role="alert"></p><div class="dialog-actions"><button class="primary" id="create-user-button">Criar acesso</button></div></form>`;
   userDialog.querySelector('.close-dialog').onclick = () => userDialog.close();
   document.querySelector('#create-user-form').onsubmit = async e => { e.preventDefault(); const button = document.querySelector('#create-user-button'); button.disabled = true; try { await request('/auth/cadastro', { method: 'POST', body: { email: document.querySelector('#new-email').value, senha: document.querySelector('#new-password').value } }); document.querySelector('#new-password').value = ''; userDialog.close(); toast('Usuário criado. Ele já pode entrar com as credenciais definidas.'); } catch (error) { const field = document.querySelector('#create-user-error'); if (field) field.textContent = error.message; } finally { button.disabled = false; } };
   userDialog.showModal();

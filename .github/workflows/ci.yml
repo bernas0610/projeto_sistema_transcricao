@@ -1,0 +1,55 @@
+name: Testes e build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Instalar FFmpeg para testes de áudio
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Testes isolados, sem PostgreSQL ou Gemini
+        working-directory: backend
+        env:
+          DB_PASSWORD: ''
+          GEMINI_API_KEY: ''
+        run: bash mvnw -B '-Dtest=*Test,!GeminiTranscriptionProviderTest' test
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Testes do frontend e build
+        working-directory: frontend
+        run: npm test && npm run build
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Testes de integridade e proteções do backup
+        run: python3 -m unittest discover -s tools/backup -v
